@@ -42,7 +42,7 @@ class CommitObject:public GitObjectStorage{
     GitObjectType type ;
     std::string content;
     public :
-    std::string writeObject( const std::string& path);
+    std::string writeObject(const std::string& currentHash ,const std::string& parentHash ,const std::string &commitMassage,const std::string &author="");
 
   std::string readObject(const std::string& hash);
   const std::string& getContent() const;
@@ -66,7 +66,11 @@ class TagObject:public GitObjectStorage{
     GitObjectType type ;
     std::string content;
     public :
-    std::string writeObject( const std::string& path);
+    std::string writeObject(const std::string& targetHash,
+                                       const std::string& targetType,
+                                       const std::string& tagName,
+                                       const std::string& tagMessage,
+                                       const std::string& taggerLine);
     const std::string& getContent() const;
        GitObjectType getType() const;
 

@@ -1,4 +1,6 @@
+#include "headers/GitConfig.hpp"
 #include "headers/GitObjectStorage.hpp"
+#include "headers/ZlibUtils.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -55,9 +57,24 @@ GitObjectType BlobObject::getType() const {
 //Commit)bject Class
 CommitObject::CommitObject() : type(GitObjectType::Commit), content("") {}
 
-std::string CommitObject::writeObject(const std::string& path) {
-    // yet to return
-    return "";
+std::string CommitObject::writeObject(const std::string& currentHash ,const std::string& parentHash ,const std::string &commitMassage,const std::string &author) {
+   std::ostringstream commitText ;
+   GitConfig commiter ;
+
+   commitText << "tree "<< currentHash;
+   commitText <<"parent "<<parentHash;
+   if(author==""){
+       commitText <<"author "<< commiter.getName() << " " << commiter.getEmail() << " " << getCurrentTimestampWithTimezone();
+   }else{
+
+   commitText <<"author "<<author<<" "<<getCurrentTimestampWithTimezone();
+   }
+   commitText <<"commiter "<< commiter.getName() << " " << commiter.getEmail() << " " << getCurrentTimestampWithTimezone();
+
+   commitText << "\n"<<commitMassage;
+
+   content = commitText.str();
+    return GitObjectStorage::writeObject(content);
 }
 
 std::string CommitObject::readObject(const std::string& hash) {
@@ -69,9 +86,48 @@ std::string CommitObject::readObject(const std::string& hash) {
         return "";
     }
 
-    content = decompressed.substr(nullPos + 1);  // Store actual commit content
+    content = decompressed.substr(nullPos+1);
+    /*
+    // std::string body = decompressed.substr(nullPos + 1);
+     * this is code for making hte commit readable
+
+    std::istringstream iss(body);
+    std::ostringstream readable;
+    std::string line;
+    bool inMessage = false;
+    std::string commitMsg;
+
+    while (std::getline(iss, line)) {
+        if (line.empty()) {
+            inMessage = true;
+            continue;
+        }
+
+        if (inMessage) {
+            commitMsg += line + "\n";
+            continue;
+        }
+
+        if (line.rfind("tree ", 0) == 0) {
+            readable << "Tree: " << line.substr(5) << "\n";
+        } else if (line.rfind("parent ", 0) == 0) {
+            readable << "Parent: " << line.substr(7) << "\n";
+        } else if (line.rfind("author ", 0) == 0) {
+            readable << "Author: " << line.substr(7) << "\n";
+        } else if (line.rfind("committer ", 0) == 0) {
+            readable << "Committer: " << line.substr(10) << "\n";
+        }
+    }
+
+    if (!commitMsg.empty()) {
+        readable << "Message:\n" << commitMsg;
+    }
+
+    content = readable.str();  // store parsed version
+     */
     return content;
 }
+
 
 const std::string& CommitObject::getContent() const {
     return content;
@@ -81,12 +137,45 @@ GitObjectType CommitObject::getType() const {
     return type;
 }
 
+
 // TreeObject Class
 TreeObject::TreeObject() : type(GitObjectType::Tree), content("") {}
 
 std::string TreeObject::writeObject(const std::string& path) {
-    // yet to implement
-    return "";
+    std::string treeContent ;
+    if(!std::filesystem::exists(path)){
+        std::cerr<<"no such directry to make tree "<<std::endl;
+        return "";
+    }
+    for(const auto  &entry : std::filesystem::directory_iterator(path)){
+        std::string mode ;
+        std::string hash ;
+        std::string filename = entry.path().filename();
+
+        if(std::filesystem::is_regular_file(entry)){
+            mode = "100644";
+            BlobObject blob;
+            hash = blob.writeObject(entry.path().string());
+        }else if(std::filesystem::is_directory(entry)){
+            mode = "040000";
+            TreeObject subTree ;
+            hash = subTree.writeObject(entry.path().string());
+        }else{
+            continue;
+        }
+        treeContent += mode+" "+filename+"\0";
+        for(int i=0 ; i<40;i+=2){
+            std::string bytestr ;
+            char byte = static_cast<char>(std::stoi(bytestr, nullptr, 16));
+            treeContent += byte;
+        }
+    }
+    std::string header = "tree " + std::to_string(treeContent.size()) + '\0';
+       std::string full = header + treeContent;
+
+       content = full; // store full binary content if needed
+
+       return GitObjectStorage::writeObject(full); // write, get hash
 }
 
 std::string TreeObject::readObject(const std::string& hash) {
@@ -132,7 +221,6 @@ std::string TreeObject::readObject(const std::string& hash) {
     return content;
 }
 
-
 const std::string& TreeObject::getContent() const {
     return content;
 }
@@ -147,10 +235,34 @@ GitObjectType TreeObject::getType() const {
 
 TagObject::TagObject() : type(GitObjectType::Tag), content("") {}
 
-std::string TagObject::writeObject(const std::string& path) {
-    //yet to be implemented
-   return "";
+std::string TagObject::writeObject(const std::string& targetHash,
+                                   const std::string& targetType,
+                                   const std::string& tagName,
+                                   const std::string& tagMessage,
+                                   const std::string& taggerLine) {
+    GitConfig config;
+    std::ostringstream tagData;
+
+    tagData << "object " << targetHash << "\n";
+    tagData << "type " << targetType << "\n";
+    tagData << "tag " << tagName << "\n";
+
+    if (taggerLine.empty()) {
+        tagData << "tagger " << config.getName() << " <" << config.getEmail() << "> "
+                << getCurrentTimestampWithTimezone() << "\n";
+    } else {
+        tagData << "tagger " << taggerLine << " " << getCurrentTimestampWithTimezone() << "\n";
+    }
+
+    tagData << "\n" << tagMessage << "\n";
+
+    content = tagData.str();
+    std::string header = "tag " + std::to_string(content.size()) + '\0';
+    std::string fullTag = header + content;
+
+    return GitObjectStorage::writeObject(fullTag);
 }
+
 
 std::string TagObject::readObject(const std::string& hash) {
     std::string decompressed = GitObjectStorage::readObject(hash);
@@ -161,41 +273,48 @@ std::string TagObject::readObject(const std::string& hash) {
         return "";
     }
 
-    std::string tagBody = decompressed.substr(nullPos + 1);
-    std::istringstream iss(tagBody);
-    std::ostringstream formatted;
+    content = decompressed.substr(nullPos + 1);
 
-    std::string line;
-    std::string tagMessage;
-    bool inMessage = false;
+    /*
+     * code to make the tag readable
 
-    while (std::getline(iss, line)) {
-        if (line.empty()) {
-            inMessage = true;
-            continue;
-        }
+     std::string tagBody = decompressed.substr(nullPos + 1);
+     std::istringstream iss(tagBody);
+     std::ostringstream formatted;
 
-        if (inMessage) {
-            tagMessage += line + "\n";
-            continue;
-        }
+     std::string line;
+     std::string tagMessage;
+     bool inMessage = false;
 
-        if (line.rfind("object ", 0) == 0) {
-            formatted << "Object: " << line.substr(7) << "\n";
-        } else if (line.rfind("type ", 0) == 0) {
-            formatted << "Type: " << line.substr(5) << "\n";
-        } else if (line.rfind("tag ", 0) == 0) {
-            formatted << "Tag: " << line.substr(4) << "\n";
-        } else if (line.rfind("tagger ", 0) == 0) {
-            formatted << "Tagger: " << line.substr(7) << "\n";
-        }
-    }
+     while (std::getline(iss, line)) {
+         if (line.empty()) {
+             inMessage = true;
+             continue;
+         }
 
-    if (!tagMessage.empty()) {
-        formatted << "Message:\n" << tagMessage;
-    }
+         if (inMessage) {
+             tagMessage += line + "\n";
+             continue;
+         }
 
-    content = formatted.str();  // store in object for getContent()
+         if (line.rfind("object ", 0) == 0) {
+             formatted << "Object: " << line.substr(7) << "\n";
+         } else if (line.rfind("type ", 0) == 0) {
+             formatted << "Type: " << line.substr(5) << "\n";
+         } else if (line.rfind("tag ", 0) == 0) {
+             formatted << "Tag: " << line.substr(4) << "\n";
+         } else if (line.rfind("tagger ", 0) == 0) {
+             formatted << "Tagger: " << line.substr(7) << "\n";
+         }
+     }
+
+     if (!tagMessage.empty()) {
+         formatted << "Message:\n" << tagMessage;
+     }
+
+     content = formatted.str();  // store in object for getContent()
+
+     */
     return content;
 }
 

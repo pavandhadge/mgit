@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <openssl/sha.h>
 #include <sstream>
+#include <ctime>
+#include <cmath>
 
 std::string decompressZlib(const std::vector<char>& compressed) {
     std::vector<char> output(100000); // Start with 100KB, resize if needed
@@ -57,4 +59,34 @@ std::string hash_sha1(const std::string& data) {
         result << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
     }
     return result.str();
+}
+
+
+
+std::string getCurrentTimestampWithTimezone() {
+    std::time_t now = std::time(nullptr);
+
+    // Get local and UTC times
+    std::tm localTime = *std::localtime(&now);
+    std::tm gmTime = *std::gmtime(&now);
+
+    // Calculate timezone offset in minutes
+    int hourDiff = localTime.tm_hour - gmTime.tm_hour;
+    int minDiff = localTime.tm_min - gmTime.tm_min;
+    int totalMinutes = hourDiff * 60 + minDiff;
+
+    // Adjust if crossing midnight boundary
+    if (localTime.tm_mday != gmTime.tm_mday) {
+        int dayDiff = localTime.tm_mday - gmTime.tm_mday;
+        totalMinutes += dayDiff * 24 * 60;
+    }
+
+    // Format timezone as +0530
+    char tzBuffer[6];
+    std::snprintf(tzBuffer, sizeof(tzBuffer), "%+03d%02d", totalMinutes / 60, std::abs(totalMinutes % 60));
+
+    // Build final output string
+    std::ostringstream result;
+    result << now << " " << tzBuffer;
+    return result.str(); // e.g. "1718945703 +0530"
 }
