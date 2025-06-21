@@ -1,4 +1,4 @@
-#include "headers/GitInit.h"
+#include "headers/GitInit.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>

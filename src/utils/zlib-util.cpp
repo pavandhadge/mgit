@@ -1,7 +1,7 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
-#include "./headers/util.h"
+#include "../headers/ZlibUtils.hpp"
 #include <zlib.h>
 #include <iostream>
 #include <iomanip>

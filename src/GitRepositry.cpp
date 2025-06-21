@@ -1,5 +1,5 @@
-#include "headers/GitRepository.h"
-#include "headers/GitInit.h"
+#include "headers/GitRepository.hpp"
+#include "headers/GitInit.hpp"
 
 GitRepository::GitRepository(const std::string& root) : gitDir(root) {}
 

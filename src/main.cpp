@@ -1,6 +1,6 @@
 #include <iostream>
 #include "utils/CLI11.hpp"
-#include "headers/GitRepository.h"
+#include "headers/GitRepository.hpp"
 
 
 

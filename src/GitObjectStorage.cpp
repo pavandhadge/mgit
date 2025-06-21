@@ -1,6 +1,6 @@
-#include "headers/GitObjectStorage.h"
-#include "utils/ZlibUtils.h"
-#include "utils/HashUtils.h"
+#include "headers/GitObjectStorage.hpp"
+#include "headers/ZlibUtils.hpp"
+#include "headers/HashUtils.hpp"
 #include <exception>
 #include <iostream>
 #include <filesystem>
@@ -13,7 +13,7 @@ GitObjectStorage::GitObjectStorage(const std::string &gitDir):gitDir(gitDir){
 
 }
 
-std::string GitObjectStorage::WriteObject(const std::string &content){
+std::string GitObjectStorage::writeObject(const std::string &content){
 
     try {
 
@@ -49,7 +49,7 @@ std::string GitObjectStorage::WriteObject(const std::string &content){
     return "";
 }
 }
-    std::string GitObjectStorage::ReadObject(const std::string& hash){
+    std::string GitObjectStorage::readObject(const std::string& hash){
 
         try {
             std::string path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);

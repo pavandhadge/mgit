@@ -1,4 +1,4 @@
-#include "headers/GitObjectStorage.h"
+#include "headers/GitObjectStorage.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
