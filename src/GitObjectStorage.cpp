@@ -13,12 +13,24 @@ GitObjectStorage::GitObjectStorage(const std::string &gitDir):gitDir(gitDir){
 
 }
 
-std::string GitObjectStorage::writeObject(const std::string &content){
+GitObjectType GitObjectStorage::identifyType(const std::string &hash){
+    std::string content = GitObjectStorage::readObject(hash);
+    size_t nullIdx = content.find('\0');
+    if (nullIdx == std::string::npos) {
+        std::cerr << "Invalid object format\n";
+        return GitObjectType::Unknown;
+    }
+    std::string header = content.substr(0, nullIdx);
+    return GitObjectStorage::parseGitObjectTypeFromString (header.substr(0, header.find(' ')));
+
+}
+std::string GitObjectStorage::writeObject(const std::string &content ){
 
     try {
 
 
         std::string hash = hash_sha1(content);
+
         std::string compressed = compressZlib(content);
 
         std::string objDir = ".git/objects/" + hash.substr(0, 2);
@@ -44,6 +56,7 @@ std::string GitObjectStorage::writeObject(const std::string &content){
 
         outFile.write(compressed.data(), compressed.size());
         outFile.close();
+        return hash;
 }catch(const std::exception &e){
     std::cout<<"exception occured at GitObjectStorage::WriteObject : "<<e.what()<<std::endl;
     return "";
@@ -88,7 +101,7 @@ std::string GitObjectStorage::writeObject(const std::string &content){
       }
   }
 
-  GitObjectType GitObjectStorage::parseTypeFromHeader(const std::string& typeStr) {
+  GitObjectType GitObjectStorage::parseGitObjectTypeFromString(const std::string& typeStr) {
       if (typeStr == "blob") return GitObjectType::Blob;
       if (typeStr == "tree") return GitObjectType::Tree;
       if (typeStr == "commit") return GitObjectType::Commit;

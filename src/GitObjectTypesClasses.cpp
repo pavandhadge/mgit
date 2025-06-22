@@ -6,10 +6,10 @@
 #include <sstream>
 #include <string>
 #include <filesystem>
-
+#include "headers/HashUtils.hpp"
 BlobObject::BlobObject() : type(GitObjectType::Blob), content("") {}
 
-std::string BlobObject::writeObject(const std::string& path) {
+std::string BlobObject::writeObject(const std::string& path , const bool &write) {
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Error: Unable to open file: " << path << "\n";
@@ -24,7 +24,11 @@ std::string BlobObject::writeObject(const std::string& path) {
     std::string blobHeader = "blob " + std::to_string(content.size()) + '\0';
     std::string fullBlob = blobHeader + content;
 
-    return GitObjectStorage::writeObject(fullBlob);
+    if(write){
+
+    return GitObjectStorage::writeObject(fullBlob );
+    }
+    return hash_sha1(fullBlob);
 }
 
 std::string BlobObject::readObject(const std::string& hash) {
@@ -141,7 +145,7 @@ GitObjectType CommitObject::getType() const {
 // TreeObject Class
 TreeObject::TreeObject() : type(GitObjectType::Tree), content("") {}
 
-std::string TreeObject::writeObject(const std::string& path) {
+std::string TreeObject::writeObject(const std::string& path ) {
     std::string treeContent ;
     if(!std::filesystem::exists(path)){
         std::cerr<<"no such directry to make tree "<<std::endl;
@@ -155,7 +159,8 @@ std::string TreeObject::writeObject(const std::string& path) {
         if(std::filesystem::is_regular_file(entry)){
             mode = "100644";
             BlobObject blob;
-            hash = blob.writeObject(entry.path().string());
+            bool write = true ;
+            hash = blob.writeObject(entry.path().string(),write);
         }else if(std::filesystem::is_directory(entry)){
             mode = "040000";
             TreeObject subTree ;

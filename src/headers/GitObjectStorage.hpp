@@ -10,16 +10,16 @@ enum class GitObjectType {
 };
 class GitObjectStorage{
   public :
-  std::string writeObject( const std::string& content);
+  std::string writeObject( const std::string& content );
 
   std::string readObject(const std::string& hash);
-
+  GitObjectType identifyType(const std::string &hash);
   GitObjectStorage(const std::string &gitDir = ".git");
   private :
   std::string gitDir;
 
       std::string objectTypeToString(GitObjectType type);
-      GitObjectType parseTypeFromHeader(const std::string& header);
+      GitObjectType parseGitObjectTypeFromString(const std::string& header);
 
 };
 
@@ -30,7 +30,7 @@ private:
 public:
     BlobObject();
 
-    std::string writeObject(const std::string& path);   // Reads file and stores blob
+    std::string writeObject(const std::string& path,const bool &write);   // Reads file and stores blob
     std::string readObject(const std::string& hash);    // Reads blob from disk
     const std::string& getContent() const;
     GitObjectType getType() const;
