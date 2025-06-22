@@ -1,59 +1,180 @@
-[![progress-banner](https://backend.codecrafters.io/progress/git/5133168f-bdea-4554-b848-366d4e8ae84d)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
-This is a starting point for C++ solutions to the
-["Build Your Own Git" Challenge](https://codecrafters.io/challenges/git).
+# 🧠 `mgit` — A Minimal Git Clone with Better Readability
 
-In this challenge, you'll build a small Git implementation that's capable of
-initializing a repository, creating commits and cloning a public repository.
-Along the way we'll learn about the `.git` directory, Git objects (blobs,
-commits, trees etc.), Git's transfer protocols and more.
+**`mgit`** is a personal Git clone written in **C++**, built to demystify how Git works internally and to explore new ways of improving its usability and readability for users.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+This project reimplements Git’s core concepts — blobs, trees, commits, tags, and object storage — using a clean CLI interface and simple architecture.
+It's built as a learning tool **and** as a possible base for more human-readable version control.
 
-# Passing the first stage
+---
 
-The entry point for your Git implementation is in `src/main.cpp`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+## 🚀 Features
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+* ✅ Git-style object storage with `.git/objects`
+* ✅ SHA-1 hashing of file data (`mgit hash-object`)
+* ✅ Tree and directory snapshotting (`mgit write-tree`)
+* ✅ Commit creation with metadata (`mgit commit-tree`)
+* ✅ Annotated tagging (`mgit tag-object`)
+* ✅ Raw and pretty object reading (`mgit cat-file`, `mgit ls-tree`)
+* ✅ CLI11-based CLI for clear UX
+* 🧪 Educational source code ideal for learning Git internals
+
+---
+
+## 🛠 Commands
+
+### 🔧 Initialization
+
+```bash
+mgit init [path]
 ```
 
-That's all!
+Creates a `.git`-like object store in the specified directory.
 
-# Stage 2 & beyond
+---
 
-Note: This section is for stages 2 and beyond.
+### 📄 Hash and Store Files
 
-1. Ensure you have `cmake` installed locally
-1. Run `./your_program.sh` to run your Git implementation, which is implemented
-   in `src/main.cpp`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
-
-# Testing locally
-
-The `your_program.sh` script is expected to operate on the `.git` folder inside
-the current working directory. If you're running this inside the root of this
-repository, you might end up accidentally damaging your repository's `.git`
-folder.
-
-We suggest executing `your_program.sh` in a different folder when testing
-locally. For example:
-
-```sh
-mkdir -p /tmp/testing && cd /tmp/testing
-/path/to/your/repo/your_program.sh init
+```bash
+mgit hash-object --file <file> [-w]
 ```
 
-To make this easier to type out, you could add a
-[shell alias](https://shapeshed.com/unix-alias/):
+* Hashes a file like Git's `hash-object`
+* Optionally writes it to `.git/objects` if `-w` is used
 
-```sh
-alias mygit=/path/to/your/repo/your_program.sh
+---
 
-mkdir -p /tmp/testing && cd /tmp/testing
-mygit init
+### 🌳 Tree Object Creation
+
+```bash
+mgit write-tree --folder <path>
 ```
+
+Recursively creates a tree object representing the directory.
+
+---
+
+### 📝 Create Commits
+
+```bash
+mgit commit-tree --tree <tree_hash> --parent <parent_hash> --message <msg> --author "<name> <email>"
+```
+
+Builds a commit object pointing to a tree and optional parent.
+
+---
+
+### 🏷 Create Tags
+
+```bash
+mgit tag-object --object <hash> --type <type> --tag <name> --message <msg> --tagger "<name> <email>"
+```
+
+Creates an annotated tag for a blob, tree, or commit.
+
+---
+
+### 🧪 Object Inspection
+
+#### Raw Dump
+
+```bash
+mgit read-object --hash <sha>
+```
+
+Prints full raw content (header + body) from object store.
+
+#### Git-style Inspection
+
+```bash
+mgit cat-file <sha> [-p] [-t] [-s]
+```
+
+* `-p` = Print content
+* `-t` = Print type
+* `-s` = Print size
+
+---
+
+### 📂 Tree Reading
+
+```bash
+mgit ls-tree --hash <tree_sha>
+```
+
+Pretty-prints a tree object, showing filenames, modes, and hashes — like `git ls-tree`.
+
+---
+
+### 🧠 Auto-type Smart Read
+
+```bash
+mgit ls-read <sha>
+```
+
+Auto-detects the type and displays content in human-readable format.
+
+---
+
+## 📚 Why I Built This
+
+I made `mgit` to:
+
+* Learn Git internals by re-implementing them
+* Understand Git objects, trees, commits, and tags deeply
+* Build a version control interface that's easier for humans to reason about
+
+It’s a personal project, educational journey, and exploration of simplicity in tooling.
+
+---
+
+## ⚙️ Build Instructions
+
+### Dependencies
+
+* C++17+
+* `zlib` (for compression)
+* [CLI11](https://github.com/CLIUtils/CLI11)
+
+### Compile
+
+```bash
+g++ -std=c++17 -lz -o mgit src/*.cpp
+```
+
+---
+
+## 📁 Project Structure
+
+```
+mgit/
+├── src/
+│   ├── main.cpp
+│   ├── GitRepository.cpp
+│   ├── BlobObject.cpp
+│   └── ...
+├── headers/
+│   └── *.hpp
+└── .git/objects/  ← Created at runtime
+```
+
+---
+
+## 📈 Roadmap
+
+* [ ] Add staging/index support (`mgit add`)
+* [ ] Implement basic branches
+* [ ] `mgit log` with pretty output
+* [ ] Remote pushing/pulling for learning
+* [ ] Explore more user-friendly logs/commits
+
+---
+
+## 🧑‍💻 Author
+
+**Sharad Etthar** — [@yourname](#)
+Learning Git internals, systems programming, and building devtools for developers.
+
+---
+
+Would you like a logo or example `.gif` of it in action for the README too?
