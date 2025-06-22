@@ -90,3 +90,34 @@ std::string getCurrentTimestampWithTimezone() {
     result << now << " " << tzBuffer;
     return result.str(); // e.g. "1718945703 +0530"
 }
+
+
+std::string hexToBinary(const std::string& hex) {
+    if (hex.length() != 40 || (hex.length() % 2) != 0) {
+        throw std::invalid_argument("Hex string must be 40 characters for SHA-1");
+    }
+
+    std::string binary;
+    binary.reserve(20);
+
+    for (size_t i = 0; i < hex.length(); i += 2) {
+        std::string byteStr = hex.substr(i, 2);
+        unsigned char byte = static_cast<unsigned char>(std::stoi(byteStr, nullptr, 16));
+        binary.push_back(static_cast<char>(byte));
+    }
+
+    return binary;
+}
+
+std::string binaryToHex(const std::string& binary) {
+    if (binary.size() != 20) {
+        throw std::invalid_argument("Binary input must be 20 bytes for SHA-1");
+    }
+
+    std::ostringstream hex;
+    hex << std::hex << std::setfill('0');
+    for (unsigned char byte : binary) {
+        hex << std::setw(2) << static_cast<unsigned int>(byte);
+    }
+    return hex.str();
+}

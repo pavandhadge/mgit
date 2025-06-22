@@ -18,4 +18,5 @@ public:
     void writeIndex();            // Writes vector entries to disk
     void addOrUpdateEntry(const IndexEntry& entry);
     const std::vector<IndexEntry>& getEntries() const;   // ← This is your return
+    void printEntries() const;
 };
