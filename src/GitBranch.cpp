@@ -1,4 +1,4 @@
-#include "headers/BranchManager.hpp"
+#include "headers/GitBranch.hpp"
 #include "headers/GitHead.hpp"
 #include <exception>
 #include <filesystem>
