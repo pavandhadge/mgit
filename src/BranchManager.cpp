@@ -1,114 +1,73 @@
 #include "headers/BranchManager.hpp"
+#include "headers/GitHead.hpp"
+#include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
 // #include <filesystem>
 
-BranchManager::BranchManager() {
-    loadBranches();
+Branch::Branch(){
+
 }
 
-void BranchManager::loadBranches() {
-    branches.clear();
-    std::ifstream in(branchesFile);
-    if (in.is_open()) {
-        std::string name, hash;
-        while (in >> name >> hash) {
-            branches[name] = hash;
-        }
-        in.close();
-    }
+bool Branch::createBranch(const std::string& branchName){
+    gitHead head ;
 
-    std::ifstream headIn(headFile);
-    if (headIn.is_open()) {
-        getline(headIn, currentBranch);
-        headIn.close();
+    std::string path = headsDir+branchName;
+    if(std::filesystem::exists(path)){
+        std::cerr<<"branch already exist "<<std::endl;
+        return false ;
     }
+    std::ofstream branchFile(path);
+    branchFile << head.getBranchHeadHash() ;
+    branchFile.close();
+    return true ;
 }
 
-void BranchManager::saveBranches() const {
-    std::ofstream out(branchesFile);
-    if (out.is_open()) {
-        for (const auto& [name, hash] : branches) {
-            out << name << " " << hash << "\n";
-        }
-        out.close();
-    }
+bool checkout(const std::string& branchName){
+    gitHead head ;
+    try{
 
-    std::ofstream headOut(headFile);
-    if (headOut.is_open()) {
-        headOut << currentBranch << "\n";
-        headOut.close();
-    }
-}
-
-void BranchManager::createBranch(const std::string& name) {
-    if (branches.find(name) != branches.end()) {
-        std::cerr << "Branch already exists.\n";
-        return;
-    }
-
-    std::ifstream headCommit(".mgit/HEAD_COMMIT");
-    std::string hash;
-    if (headCommit.is_open()) {
-        getline(headCommit, hash);
-        headCommit.close();
-    }
-
-    if (hash.empty()) {
-        std::cerr << "No commit found to base the branch on.\n";
-        return;
-    }
-
-    branches[name] = hash;
-    saveBranches();
-    std::cout << "Branch '" << name << "' created at " << hash << "\n";
-}
-
-void BranchManager::listBranches() const {
-    std::cout << "Branches:\n";
-    for (const auto& [name, hash] : branches) {
-        if (name == currentBranch) {
-            std::cout << "* ";
-        } else {
-            std::cout << "  ";
-        }
-        std::cout << name << " (" << hash << ")\n";
-    }
-}
-
-bool BranchManager::checkoutBranch(const std::string& name) {
-    if (branches.find(name) == branches.end()) {
-        std::cerr << "Branch does not exist.\n";
+    head.writeHeadToHeadOfNewBranch(branchName);
+    return true;
+    }catch(const std::exception &e){
+        std::cerr<<"error while updating head file "<<e.what()<<std::endl;
         return false;
     }
+}
+std::string Branch::getCurrentBranch()const {
+    gitHead head ;
+    return head.getBranch() ;
+}
 
-    std::string targetHash = branches[name];
+std::vector<std::string> Branch::listBranches() const{
+    std::vector<std::string> branchList;
+    for(const auto& entity : std::filesystem::directory_iterator(headsDir) ){
+        if(!entity.is_regular_file()){
+            continue;
+        }
+        branchList.push_back(entity.path().filename());
+    }
+    return branchList;
+}
 
-    // You may choose to load this commit into the working directory here
-    std::ofstream headCommit(".mgit/HEAD_COMMIT");
-    if (headCommit.is_open()) {
-        headCommit << targetHash << "\n";
-        headCommit.close();
+std::string Branch::getBranchHash(const std::string& branchName) const{
+    gitHead head ;
+    return head.getBranchHeadHash() ;
+    // return hash ;
+}
+
+bool Branch::updateBranchHead(const std::string& branchName, const std::string& newHash){
+    std::string path = headsDir+branchName;
+    if(!std::filesystem::exists(path)){
+        std::cerr<<"branch does not exist"<<std::endl;
+        std::cout<<"to make new branch use git branch or git checkout command"<<std::endl;
+        return false ;
     }
 
-    currentBranch = name;
-    saveBranches();
+    std::ofstream branchFile(path);
+    branchFile << newHash;
+    branchFile.close();
     return true;
-}
-
-void BranchManager::updateHEAD(const std::string& branchName) {
-    currentBranch = branchName;
-    saveBranches();
-}
-
-std::string BranchManager::getCurrentBranch() const {
-    return currentBranch;
-}
-
-std::string BranchManager::getBranchHead(const std::string& name) const {
-    auto it = branches.find(name);
-    if (it != branches.end()) {
-        return it->second;
-    }
-    return "";
 }
