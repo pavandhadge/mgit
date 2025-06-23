@@ -20,11 +20,12 @@ public:
     std::vector<std::string> listBranches() const;
 
     // Get the commit hash where a branch currently points
-    std::string getBranchHash(const std::string& branchName) const;
+    std::string getCurrentBranchHash() const;
 
     // Update the commit hash a branch points to
     bool updateBranchHead(const std::string& branchName, const std::string& newHash);
 
+    std::string getBranchHash(const std::string& branchName) const ;
 private:
     std::string gitDir = ".git/";
     std::string headsDir = ".git/refs/heads/";

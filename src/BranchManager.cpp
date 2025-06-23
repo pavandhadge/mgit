@@ -25,7 +25,7 @@ bool Branch::createBranch(const std::string& branchName){
     return true ;
 }
 
-bool checkout(const std::string& branchName){
+bool Branch::checkout(const std::string& branchName){
     gitHead head ;
     try{
 
@@ -52,11 +52,22 @@ std::vector<std::string> Branch::listBranches() const{
     return branchList;
 }
 
-std::string Branch::getBranchHash(const std::string& branchName) const{
+std::string Branch::getCurrentBranchHash() const{
     gitHead head ;
     return head.getBranchHeadHash() ;
     // return hash ;
 }
+
+std::string Branch::getBranchHash(const std::string& branchName) const {
+    std::string path = headsDir + branchName;
+    if (!std::filesystem::exists(path)) return "";
+
+    std::ifstream in(path);
+    std::string hash;
+    getline(in, hash);
+    return hash;
+}
+
 
 bool Branch::updateBranchHead(const std::string& branchName, const std::string& newHash){
     std::string path = headsDir+branchName;
