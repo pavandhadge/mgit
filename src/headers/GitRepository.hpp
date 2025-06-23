@@ -23,4 +23,18 @@ public :
 
      std::string readObjectRaw(const std::string &path);
  void indexHandler(const std::vector<std::string> &paths={"."});
+
+ void CreateBranch(const std::string &branchName);
+ void listbranches(const std::string &branchName);
+ std::string getCurrentBranch()const ;
+
+ void changeCurrentBranch(const std::string &targetBranch , bool createflag);
+
+ std::string getHashOfBranchHead(const std::string &branchName);
+
+ bool deleteBranch(const std::string &branchName);
+
+ bool renameBranch(const std::string& oldName, const std::string& newName);
+ bool isFullyMerged(std::string branchName);
+
 };

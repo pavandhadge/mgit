@@ -1,3 +1,4 @@
+#include "headers/GitHead.hpp"
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/GitInit.hpp"
@@ -5,6 +6,7 @@
 #include <vector>
 #include <filesystem>
 #include "headers/GitIndex.hpp"
+#include "headers/GitBranch.hpp"
 
 GitRepository::GitRepository(const std::string& root) : gitDir(root) {}
 
@@ -49,9 +51,6 @@ std::string GitRepository::writeObject(GitObjectType type, const TagData& data) 
     TagObject tag;
     return tag.writeObject(data);
 }
-
-
-
 
 std::string GitRepository::readObjectRaw(const std::string& path){
     GitObjectStorage obj;
@@ -98,7 +97,6 @@ std::string GitRepository::readObject(const GitObjectType type, const std::strin
         return "";
     }
 }
-
 
  void GitRepository::indexHandler(const std::vector<std::string>& paths) {
      IndexManager idx;
@@ -154,4 +152,51 @@ void GitRepository::reportStatus(bool shortFormat , bool showUntracked ) {
      }
 
      std::cout<<out.str()<<std::endl;
- }
+}
+
+void GitRepository::CreateBranch(const std::string &branchName){
+    Branch branchObj;
+    branchObj.createBranch(branchName);
+}
+void GitRepository::listbranches(const std::string &branchName){
+    Branch branchObj;
+    std::vector<std::string> branchList = branchObj.listBranches();
+    std::string currBranch = branchObj.getCurrentBranch();
+
+    for(const std::string branch : branchList){
+        if(branch==currBranch){
+            std::cout<<"*";
+        }
+        std::cout<<branch<<std::endl;
+    }
+}
+std::string GitRepository::getCurrentBranch()const {
+    Branch branchObj;
+    return branchObj.getCurrentBranch();
+}
+
+void GitRepository::changeCurrentBranch(const std::string &targetBranch , bool createflag){
+    if(createflag){
+        CreateBranch(targetBranch);
+    }
+    //alot to do here but currently we wait
+    Branch branchObj;
+    gitHead head;
+    head.writeHeadToHeadOfNewBranch(targetBranch);
+
+}
+
+std::string GitRepository::getHashOfBranchHead(const std::string &branchName){
+     Branch branchObj;
+    return branchObj.getBranchHash(branchName);
+}
+
+bool GitRepository::deleteBranch(const std::string &branchName){
+    Branch branchObj;
+    return branchObj.deleteBranch(branchName);
+}
+
+bool GitRepository::renameBranch(const std::string& oldName, const std::string& newName){
+    Branch branchObj;
+    return branchObj.renameBranch(oldName,newName);
+}

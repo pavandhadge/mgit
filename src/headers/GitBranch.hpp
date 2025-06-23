@@ -24,7 +24,8 @@ public:
 
     // Update the commit hash a branch points to
     bool updateBranchHead(const std::string& branchName, const std::string& newHash);
-
+    bool deleteBranch(const std::string &branchName);
+    bool renameBranch(const std::string& oldName, const std::string& newName);
     std::string getBranchHash(const std::string& branchName) const ;
 private:
     std::string gitDir = ".git/";
