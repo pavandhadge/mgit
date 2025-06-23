@@ -112,3 +112,21 @@ std::string BranchManager::getBranchHead(const std::string& name) const {
     }
     return "";
 }
+
+//Branch deletion
+bool BranchManager::deleteBranch(const std::string& name) {
+    if (branches.find(name) == branches.end()) {
+        std::cerr << "Branch '" << name << "' does not exist.\n";
+        return false;
+    }
+
+    if (name == currentBranch) {
+        std::cerr << "Cannot delete the currently checked out branch '" << name << "'.\n";
+        return false;
+    }
+
+    branches.erase(name);
+    saveBranches();
+    std::cout << "Deleted branch '" << name << "'\n";
+    return true;
+}

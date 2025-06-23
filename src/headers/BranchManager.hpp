@@ -8,6 +8,7 @@ public:
     void createBranch(const std::string& name);
     void listBranches() const;
     bool checkoutBranch(const std::string& name);
+    bool deleteBranch(const std::string& name);
     std::string getCurrentBranch() const;
     void updateHEAD(const std::string& branchName);
     std::string getBranchHead(const std::string& name) const;

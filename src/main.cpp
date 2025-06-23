@@ -190,6 +190,10 @@ int main(int argc, char** argv) {
     auto branchCheckoutCmd = app.add_subcommand("checkout", "Switch to another branch");
     branchCheckoutCmd->add_option("name", branchToCheckout, "Name of the branch to switch to")->required();
 
+    //delete branch
+    std::string branchToDelete;
+    auto branchDeleteCmd = app.add_subcommand("branch-delete", "Delete a branch");
+    branchDeleteCmd->add_option("name", branchToDelete, "Branch name to delete")->required();
 
     CLI11_PARSE(app, argc, argv);
 
