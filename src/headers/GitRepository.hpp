@@ -8,7 +8,7 @@ class GitRepository{
   std::string gitDir;
       // std::unique_ptr<GitObjectStore> objectStore;
 public :
- std::string status();
+ void reportStatus(bool shortFormat = false, bool showUntracked = true);
     GitRepository(const std::string& root = ".git");
     void init(const std::string &path);
     // For blob/tree:

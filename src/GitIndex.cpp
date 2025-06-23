@@ -142,7 +142,7 @@ void IndexManager::printEntries() const {
     }
 }
 
-std::vector<std::pair<std::string, std::string>> IndexManager::status() {
+std::vector<std::pair<std::string, std::string>> IndexManager::computeStatus() {
     std::vector<std::pair<std::string, std::string>> changeRecords;
 
     // Step 1: Load index

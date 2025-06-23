@@ -85,6 +85,13 @@ void handleAddCommand(GitRepository& repo, const std::vector<std::string>& paths
     repo.indexHandler(paths);
 }
 
+void handleStatusCommand(GitRepository& repo, bool shortFormat,
+bool showUntracked,
+bool showIgnore,
+bool showBranch){
+    repo.reportStatus(shortFormat , showUntracked);
+}
+
 int main(int argc, char** argv) {
     CLI::App app{"yourgit - a minimal Git implementation"};
     GitRepository repo;
@@ -154,6 +161,19 @@ int main(int argc, char** argv) {
            ->check(CLI::ExistingPath) // Optional: check if file/folder exists
            ->expected(-1); // Allow unlimited number of arguments
 
+
+    bool shortFormat = false;
+    bool showUntracked = false;
+    bool showIgnore = false;
+    bool showBranch = false;
+    auto statusCmd = app.add_subcommand("status", "Git style status");
+    statusCmd->add_flag("-s", shortFormat, "Show short format output");
+    statusCmd->add_flag("--short", shortFormat, "Show short format output");
+    statusCmd->add_flag("--untracked-files", showUntracked, "Show untracked files");
+    statusCmd->add_flag("--ignored", showIgnore, "Show ignored files");
+    statusCmd->add_flag("--branch", showBranch, "Show branch info");
+
+
     CLI11_PARSE(app, argc, argv);
 
     if (*initCmd) {
@@ -180,6 +200,11 @@ int main(int argc, char** argv) {
         handleLsTree(repo, lsTreeHash);
     }else if(*add_cmd){
         handleAddCommand(repo, addCommandPaths);
+    }else if(*statusCmd){
+        handleStatusCommand(repo ,shortFormat,
+    showUntracked,
+    showIgnore,
+    showBranch);
     } else {
         std::cout << app.help() << "\n";
     }

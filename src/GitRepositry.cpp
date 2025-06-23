@@ -112,8 +112,28 @@ std::string GitRepository::readObjectRaw(const std::string& path){
      idx.writeIndex();
  }
 
- std::string GitRepository::status(){
+void GitRepository::reportStatus(bool shortFormat , bool showUntracked ) {
      IndexManager idx;
-     idx.status();
+     auto changes = idx.computeStatus(); // your function returning vector<pair<string, string>>
 
+     std::ostringstream out;
+
+     for (const auto& [status, path] : changes) {
+         if (!showUntracked && status == "untracked:") {
+             continue;  // skip untracked files if flag is off
+         }
+         if (shortFormat) {
+             // Print short status codes, like 'M ', '?? '
+             if (status == "modified:") out << "M ";
+             else if (status == "untracked:") out << "?? ";
+             else if (status == "deleted:") out << "D ";
+             else out << "  "; // unknown, print blank
+             out << path << "\n";
+         } else {
+             // Long format: full words
+             out << status << " " << path << "\n";
+         }
+     }
+
+     std::cout<<out.str()<<std::endl;
  }
