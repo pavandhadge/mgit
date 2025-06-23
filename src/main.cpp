@@ -81,6 +81,10 @@ void handleLsTree(GitRepository& repo, const std::string& hash) {
     }
 }
 
+void handleAddCommand(GitRepository& repo, const std::vector<std::string>& paths){
+    repo.indexHandler(paths);
+}
+
 int main(int argc, char** argv) {
     CLI::App app{"yourgit - a minimal Git implementation"};
     GitRepository repo;
@@ -143,6 +147,13 @@ int main(int argc, char** argv) {
     auto lsTreeCmd = app.add_subcommand("ls-tree", "List tree object contents");
     lsTreeCmd->add_option("hash", lsTreeHash)->required();
 
+    std::vector<std::string> addCommandPaths;
+    auto add_cmd = app.add_subcommand("add", "Add files to the staging area");
+    add_cmd->add_option("paths", addCommandPaths, "Paths to add to the index")
+           ->required()
+           ->check(CLI::ExistingPath) // Optional: check if file/folder exists
+           ->expected(-1); // Allow unlimited number of arguments
+
     CLI11_PARSE(app, argc, argv);
 
     if (*initCmd) {
@@ -167,6 +178,8 @@ int main(int argc, char** argv) {
         handleLsRead(repo, lsHash);
     } else if (*lsTreeCmd) {
         handleLsTree(repo, lsTreeHash);
+    }else if(*add_cmd){
+        handleAddCommand(repo, addCommandPaths);
     } else {
         std::cout << app.help() << "\n";
     }

@@ -2,6 +2,7 @@
 #include <string>
 #include <memory.h>
 #include "GitObjectStorage.hpp"
+#include <vector>
 class GitRepository{
   private :
   std::string gitDir;
@@ -29,5 +30,5 @@ public :
      std::string readObject(const GitObjectType type , const std::string& hash);
 
      std::string readObjectRaw(const std::string &path);
-
+ void indexHandler(const std::vector<std::string> &paths={"."});
 };

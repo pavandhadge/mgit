@@ -19,4 +19,5 @@ public:
     void addOrUpdateEntry(const IndexEntry& entry);
     const std::vector<IndexEntry>& getEntries() const;   // ← This is your return
     void printEntries() const;
+    IndexEntry gitIndexEntryFromPath(const std::string &path);
 };

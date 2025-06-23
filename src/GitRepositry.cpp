@@ -2,6 +2,9 @@
 #include "headers/GitRepository.hpp"
 #include "headers/GitInit.hpp"
 #include <iostream>
+#include <vector>
+#include <filesystem>
+#include "headers/GitIndex.hpp"
 
 GitRepository::GitRepository(const std::string& root) : gitDir(root) {}
 
@@ -77,4 +80,34 @@ std::string GitRepository::readObjectRaw(const std::string& path){
          std::cerr<<"invalid object type "<<std::endl;
          return "";
      }
+ }
+
+ void GitRepository::indexHandler(const std::vector<std::string>& paths) {
+     IndexManager idx;
+     idx.readIndex();
+
+     if (paths.size() == 1 && paths[0] == ".") {
+         for (const auto& entry : std::filesystem::recursive_directory_iterator(".")) {
+             if (entry.is_regular_file()) {
+                 std::string pathStr = entry.path().string();
+                 IndexEntry newEntry = idx.gitIndexEntryFromPath(pathStr);
+                 if (!newEntry.hash.empty()) {
+                     idx.addOrUpdateEntry(newEntry);
+                 }
+             }
+         }
+     } else {
+         for (const std::string& path : paths) {
+             if (!std::filesystem::exists(path)) {
+                 std::cerr << "Error: Path does not exist: " << path << std::endl;
+                 continue; // don't return, just skip this one
+             }
+             IndexEntry newEntry = idx.gitIndexEntryFromPath(path);
+             if (!newEntry.hash.empty()) {
+                 idx.addOrUpdateEntry(newEntry);
+             }
+         }
+     }
+
+     idx.writeIndex();
  }

@@ -1,13 +1,60 @@
 #include <fstream>
 #include <iostream>
+#include "headers/HashUtils.hpp"
 #include "headers/ZlibUtils.hpp"
 #include <string>
 #include <vector>
 #include <sstream>
 #include <filesystem>
 #include "headers/GitIndex.hpp"
+#include "headers/GitObjectStorage.hpp"
 
+IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
+    IndexEntry newEntry;
 
+    if (!std::filesystem::exists(path)) {
+        std::cerr << "Error: File does not exist at path: " << path << "\n";
+        return newEntry;
+    }
+
+    newEntry.path = path;
+
+    std::string hash;
+    std::string mode;
+
+    if (std::filesystem::is_regular_file(path)) {
+        // Read content
+        std::ifstream curr_file(path, std::ios::binary);
+        if (!curr_file.is_open()) {
+            std::cerr << "Unable to open the file: " << path << std::endl;
+            return newEntry;
+        }
+
+        std::ostringstream data;
+        data << curr_file.rdbuf();
+        std::string content = data.str();
+
+        // Set mode and write blob
+        mode = "100644";
+        BlobObject blob;
+        bool write = true;
+        hash = blob.writeObject(path, write);
+
+        curr_file.close();
+    } else if (std::filesystem::is_directory(path)) {
+        // Set mode and write tree
+        mode = "040000";
+        TreeObject subTree;
+        hash = subTree.writeObject(path);
+    } else {
+        std::cerr << "Unsupported file type at path: " << path << "\n";
+        return newEntry;
+    }
+
+    newEntry.mode = mode;
+    newEntry.hash = hash;
+    return newEntry;
+}
 
 void IndexManager::readIndex() {
     std::string path = ".git/INDEX";
