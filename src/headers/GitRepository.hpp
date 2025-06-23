@@ -35,6 +35,6 @@ public :
  bool deleteBranch(const std::string &branchName);
 
  bool renameBranch(const std::string& oldName, const std::string& newName);
- bool isFullyMerged(std::string branchName);
+ bool isFullyMerged(const std::string& branchName);
 
 };

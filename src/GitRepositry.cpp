@@ -200,3 +200,7 @@ bool GitRepository::renameBranch(const std::string& oldName, const std::string& 
     Branch branchObj;
     return branchObj.renameBranch(oldName,newName);
 }
+
+bool GitRepository::isFullyMerged(const std::string& branchName){
+    return true;
+}
