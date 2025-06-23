@@ -30,31 +30,27 @@ std::string GitRepository::writeObject(const GitObjectType type, const std::stri
 
 
 // ---------- Commit ----------
-std::string GitRepository::writeObject(GitObjectType type,const std::string& currentHash,
-                         const std::string& parentHash,
-                         const std::string& commitMessage,
-                         const std::string& author ) {
-                             if(type != GitObjectType::Commit){
-                                 std::cerr<<"invalid object type used"<<std::endl;
-                                 return "";
-                             }
+std::string GitRepository::writeObject(GitObjectType type, const CommitData& data) {
+    if (type != GitObjectType::Commit) {
+        std::cerr << "Invalid object type used for commit\n";
+        return "";
+    }
     CommitObject commit;
-    return commit.writeObject(currentHash, parentHash, commitMessage, author);
+    return commit.writeObject(data);
 }
 
+
 // ---------- Tag ----------
-std::string GitRepository::writeObject(GitObjectType type,const std::string& targetHash,
-                         const std::string& targetType,
-                         const std::string& tagName,
-                         const std::string& tagMessage,
-                         const std::string& taggerLine) {
-                             if(type != GitObjectType::Tag){
-                                 std::cerr<<"invalid object type used"<<std::endl;
-                                 return "";
-                             }
+std::string GitRepository::writeObject(GitObjectType type, const TagData& data) {
+    if (type != GitObjectType::Tag) {
+        std::cerr << "Invalid object type used for tag\n";
+        return "";
+    }
     TagObject tag;
-    return tag.writeObject(targetHash, targetType, tagName, tagMessage, taggerLine);
+    return tag.writeObject(data);
 }
+
+
 
 
 std::string GitRepository::readObjectRaw(const std::string& path){
@@ -62,25 +58,47 @@ std::string GitRepository::readObjectRaw(const std::string& path){
     return obj.readObject(path);
 }
 
- std::string GitRepository::readObject(const GitObjectType type , const std::string& hash){
-     if(type == GitObjectType::Blob){
-         BlobObject blob;
-         return blob.readObject(hash);
-     }else if(type == GitObjectType::Tree){
-         TreeObject tree;
-         return tree.readObject(hash);
+std::string GitRepository::readObject(const GitObjectType type, const std::string& hash) {
+    if (type == GitObjectType::Blob) {
+        BlobObject blob;
+        BlobData data = blob.readObject(hash);
+        return data.content;
+    } else if (type == GitObjectType::Tree) {
+        TreeObject tree;
+        std::vector<TreeEntry> entries = tree.readObject(hash);
+        std::ostringstream out;
+        for (const auto& entry : entries) {
+            out << entry.mode << " " << entry.filename << " " << entry.hash << "\n";
+        }
+        return out.str();
+    } else if (type == GitObjectType::Tag) {
+        TagObject tag;
+        TagData data = tag.readObject(hash);
+        std::ostringstream out;
+        out << "Object: " << data.objectHash << "\n"
+            << "Type: " << data.objectType << "\n"
+            << "Tag: " << data.tagName << "\n"
+            << "Tagger: " << data.tagger << "\n"
+            << "Message: " << data.message << "\n";
+        return out.str();
+    } else if (type == GitObjectType::Commit) {
+        CommitObject commit;
+        CommitData data = commit.readObject(hash);
+        std::ostringstream out;
+        out << "Tree: " << data.tree << "\n";
+        for (const auto& parent : data.parents) {
+            out << "Parent: " << parent << "\n";
+        }
+        out << "Author: " << data.author << "\n"
+            << "Committer: " << data.committer << "\n"
+            << "Message: " << data.message << "\n";
+        return out.str();
+    } else {
+        std::cerr << "Invalid object type\n";
+        return "";
+    }
+}
 
-     }else if(type == GitObjectType::Tag){
-         TagObject tag ;
-         return tag.readObject(hash);
-     }else if(type==GitObjectType::Commit){
-         CommitObject commit ;
-         return commit.readObject(hash);
-     }else {
-         std::cerr<<"invalid object type "<<std::endl;
-         return "";
-     }
- }
 
  void GitRepository::indexHandler(const std::vector<std::string>& paths) {
      IndexManager idx;

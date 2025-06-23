@@ -2,8 +2,9 @@
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "utils/CLI11.hpp"
-#include "headers/BranchManager.hpp"
-
+#include "headers/GitBranch.hpp"
+#include "headers/GitConfig.hpp"
+#include "headers/ZlibUtils.hpp"
 
 void handleInit(GitRepository& repo, const std::string& path) {
     repo.init(path);
@@ -19,20 +20,45 @@ void handleWriteTree(GitRepository& repo, const std::string& folder) {
     std::string hash = repo.writeObject(GitObjectType::Tree, folder, true);
     std::cout << "Tree object written: " << hash << "\n";
 }
-
 void handleCommitTree(GitRepository& repo, const std::string& tree,
                       const std::string& parent, const std::string& message,
                       const std::string& author) {
-    std::string hash = repo.writeObject(GitObjectType::Commit, tree, parent, message, author);
+    CommitData data;
+    data.tree = tree;
+
+    if (!parent.empty()) {
+        data.parents.push_back(parent);
+    }
+
+    data.author = author.empty()
+                    ? GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone()
+                    : author;
+
+    data.committer = GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone();
+    data.message = message;
+
+    std::string hash = repo.writeObject(GitObjectType::Commit, data);
     std::cout << "Commit object written: " << hash << "\n";
 }
 
 void handleTagObject(GitRepository& repo, const std::string& targetHash,
                      const std::string& targetType, const std::string& tagName,
                      const std::string& tagMessage, const std::string& tagger) {
-    std::string hash = repo.writeObject(GitObjectType::Tag, targetHash, targetType, tagName, tagMessage, tagger);
+    TagData data;
+    data.objectHash = targetHash;
+    data.objectType = targetType;
+    data.tagName = tagName;
+
+    data.tagger = tagger.empty()
+                    ? GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone()
+                    : tagger + " " + getCurrentTimestampWithTimezone();
+
+    data.message = tagMessage;
+
+    std::string hash = repo.writeObject(GitObjectType::Tag, data);
     std::cout << "Tag object written: " << hash << "\n";
 }
+
 
 void handleReadObject(GitRepository& repo, const std::string& hash) {
     std::string content = repo.readObjectRaw(hash);
@@ -163,7 +189,6 @@ int main(int argc, char** argv) {
            ->check(CLI::ExistingPath) // Optional: check if file/folder exists
            ->expected(-1); // Allow unlimited number of arguments
 
-    BranchManager branchManager;
 
 
     bool shortFormat = false;
@@ -178,17 +203,18 @@ int main(int argc, char** argv) {
     statusCmd->add_flag("--branch", showBranch, "Show branch info");
 
     // branch-create
-    std::string branchName;
-    auto branchCreateCmd = app.add_subcommand("branch-create", "Create a new branch");
-    branchCreateCmd->add_option("name", branchName, "Name of the new branch")->required();
+    // BranchManager branchManager;
+    // std::string branchName;
+    // auto branchCreateCmd = app.add_subcommand("branch-create", "Create a new branch");
+    // branchCreateCmd->add_option("name", branchName, "Name of the new branch")->required();
 
-    // branch-list
-    auto branchListCmd = app.add_subcommand("branch-list", "List all branches");
+    // // branch-list
+    // auto branchListCmd = app.add_subcommand("branch-list", "List all branches");
 
-    // checkout
-    std::string branchToCheckout;
-    auto branchCheckoutCmd = app.add_subcommand("checkout", "Switch to another branch");
-    branchCheckoutCmd->add_option("name", branchToCheckout, "Name of the branch to switch to")->required();
+    // // checkout
+    // std::string branchToCheckout;
+    // auto branchCheckoutCmd = app.add_subcommand("checkout", "Switch to another branch");
+    // branchCheckoutCmd->add_option("name", branchToCheckout, "Name of the branch to switch to")->required();
 
 
     CLI11_PARSE(app, argc, argv);
@@ -222,31 +248,33 @@ int main(int argc, char** argv) {
         showUntracked,
         showIgnore,
         showBranch);
-    } else if (*branchCreateCmd) {
-    branchManager.createBranch(branchName);
-    } else if (*branchListCmd) {
-    branchManager.listBranches();
-    } else if (*branchCheckoutCmd) {
-        if (repo.hasUncommittedChanges()) {
-            std::cout << "Uncommitted changes exist. Save before switching? (y/n/c): ";
-            char resp;
-            std::cin >> resp;
-            if (resp == 'y') {
-                repo.commitStagedFiles("Auto-commit before switch"); // You must implement this method
-            } else if (resp == 'n') {
-                repo.discardWorkingChanges(); // Optional: create this method
-            } else {
-                std::cout << "Cancelled branch switch.\n";
-                return 0;
-            }
     }
+    // else if (*branchCreateCmd) {
+    // branchManager.createBranch(branchName);
+    // } else if (*branchListCmd) {
+    // branchManager.listBranches();
+    // } else if (*branchCheckoutCmd) {
+    //     if (repo.hasUncommittedChanges()) {
+    //         std::cout << "Uncommitted changes exist. Save before switching? (y/n/c): ";
+    //         char resp;
+    //         std::cin >> resp;
+    //         if (resp == 'y') {
+    //             repo.commitStagedFiles("Auto-commit before switch"); // You must implement this method
+    //         } else if (resp == 'n') {
+    //             repo.discardWorkingChanges(); // Optional: create this method
+    //         } else {
+    //             std::cout << "Cancelled branch switch.\n";
+    //             return 0;
+    //         }
+    // }
 
-    if (branchManager.checkoutBranch(branchToCheckout)) {
-        std::cout << "Switched to branch '" << branchToCheckout << "'\n";
-    } else {
-        std::cerr << "Failed to switch to branch '" << branchToCheckout << "'\n";
-    }
-    }else {
+    // if (branchManager.checkoutBranch(branchToCheckout)) {
+    //     std::cout << "Switched to branch '" << branchToCheckout << "'\n";
+    // } else {
+    //     std::cerr << "Failed to switch to branch '" << branchToCheckout << "'\n";
+    // }
+    // }
+    else {
         std::cout << app.help() << "\n";
     }
 

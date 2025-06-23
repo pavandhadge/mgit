@@ -103,22 +103,3 @@ class TagObject:public GitObjectStorage{
        TagData readObject(const std::string& hash);
   TagObject();
 };
-
-/*
- * use following the blob or other codes
- *         std::ifstream file(path, std::ios::binary);
- if (!file.is_open()) {
-     std::cerr << "Error: Unable to open file: " << path << "\n";
-     return EXIT_FAILURE;
- }
-
- std::ostringstream buffer;
- buffer << file.rdbuf();
- std::string fileData = buffer.str();
- file.close();
-
- std::string blobHeader = "blob " + std::to_string(fileData.size()) + '\0';
- std::string fullBlob = blobHeader + fileData;
- *
- *
- */

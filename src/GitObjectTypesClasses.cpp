@@ -1,6 +1,6 @@
-#include "headers/GitConfig.hpp"
+
 #include "headers/GitObjectStorage.hpp"
-#include "headers/ZlibUtils.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -172,9 +172,10 @@ std::string CommitObject::writeObject(const CommitData& data) {
 
     // Message (separated by a blank line)
     commitText << "\n" << data.message << "\n";
-
-    std::string fullContent = commitText.str();
+    std::string body = commitText.str();
+    std::string header = "commit " + std::to_string(body.size()) + '\0';
     content = data;
+    std::string fullContent = header+body;
     return GitObjectStorage::writeObject(fullContent);
 }
 
@@ -242,22 +243,23 @@ GitObjectType CommitObject::getType() const {
 TagObject::TagObject() : type(GitObjectType::Tag), content({}) {}
 
 std::string TagObject::writeObject(const TagData& data) {
-    std::ostringstream tagData;
+    std::ostringstream tagStream;
 
-    tagData << "object " << data.objectHash << "\n";
-    tagData << "type " << data.objectType << "\n";
-    tagData << "tag " << data.tagName << "\n";
-    tagData << "tagger " << data.tagger << "\n";
+    tagStream << "object " << data.objectHash << "\n";
+    tagStream << "type " << data.objectType << "\n";
+    tagStream << "tag " << data.tagName << "\n";
+    tagStream << "tagger " << data.tagger << "\n";
+    tagStream << "\n" << data.message << "\n";
 
-    tagData << "\n" << data.message << "\n";
-
+    std::string body = tagStream.str();  // cache it
     content = data;
 
-    std::string header = "tag " + std::to_string(content.size()) + '\0';
-    std::string fullTag = header + content;
+    std::string header = "tag " + std::to_string(body.size()) + '\0';
+    std::string fullTag = header + body;
 
     return GitObjectStorage::writeObject(fullTag);
 }
+
 
 
 
