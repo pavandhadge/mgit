@@ -2,6 +2,8 @@
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "utils/CLI11.hpp"
+#include "headers/BranchManager.hpp"
+
 
 void handleInit(GitRepository& repo, const std::string& path) {
     repo.init(path);
@@ -161,6 +163,8 @@ int main(int argc, char** argv) {
            ->check(CLI::ExistingPath) // Optional: check if file/folder exists
            ->expected(-1); // Allow unlimited number of arguments
 
+    BranchManager branchManager;
+
 
     bool shortFormat = false;
     bool showUntracked = false;
@@ -172,6 +176,19 @@ int main(int argc, char** argv) {
     statusCmd->add_flag("--untracked-files", showUntracked, "Show untracked files");
     statusCmd->add_flag("--ignored", showIgnore, "Show ignored files");
     statusCmd->add_flag("--branch", showBranch, "Show branch info");
+
+    // branch-create
+    std::string branchName;
+    auto branchCreateCmd = app.add_subcommand("branch-create", "Create a new branch");
+    branchCreateCmd->add_option("name", branchName, "Name of the new branch")->required();
+
+    // branch-list
+    auto branchListCmd = app.add_subcommand("branch-list", "List all branches");
+
+    // checkout
+    std::string branchToCheckout;
+    auto branchCheckoutCmd = app.add_subcommand("checkout", "Switch to another branch");
+    branchCheckoutCmd->add_option("name", branchToCheckout, "Name of the branch to switch to")->required();
 
 
     CLI11_PARSE(app, argc, argv);
@@ -202,10 +219,34 @@ int main(int argc, char** argv) {
         handleAddCommand(repo, addCommandPaths);
     }else if(*statusCmd){
         handleStatusCommand(repo ,shortFormat,
-    showUntracked,
-    showIgnore,
-    showBranch);
+        showUntracked,
+        showIgnore,
+        showBranch);
+    } else if (*branchCreateCmd) {
+    branchManager.createBranch(branchName);
+    } else if (*branchListCmd) {
+    branchManager.listBranches();
+    } else if (*branchCheckoutCmd) {
+        if (repo.hasUncommittedChanges()) {
+            std::cout << "Uncommitted changes exist. Save before switching? (y/n/c): ";
+            char resp;
+            std::cin >> resp;
+            if (resp == 'y') {
+                repo.commitStagedFiles("Auto-commit before switch"); // You must implement this method
+            } else if (resp == 'n') {
+                repo.discardWorkingChanges(); // Optional: create this method
+            } else {
+                std::cout << "Cancelled branch switch.\n";
+                return 0;
+            }
+    }
+
+    if (branchManager.checkoutBranch(branchToCheckout)) {
+        std::cout << "Switched to branch '" << branchToCheckout << "'\n";
     } else {
+        std::cerr << "Failed to switch to branch '" << branchToCheckout << "'\n";
+    }
+    }else {
         std::cout << app.help() << "\n";
     }
 
