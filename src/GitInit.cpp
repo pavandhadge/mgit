@@ -1,4 +1,5 @@
 #include "headers/GitInit.hpp"
+#include "headers/GitHead.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -21,6 +22,9 @@ void GitInit::run() {
         createDirectory(gitDir + "/objects");
         createDirectory(gitDir + "/refs/heads");
         createFile(gitDir + "/HEAD", "ref: refs/heads/main\n");
+
+        gitHead head;
+        head.writeHeadToHeadOfNewBranch("main");
 
     } catch (const std::exception& e) {
         std::cerr << "Init error: " << e.what() << "\n";
