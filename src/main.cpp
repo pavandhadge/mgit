@@ -177,7 +177,76 @@ int main(int argc, char** argv) {
     statusCmd->add_flag("--ignored", showIgnore, "Show ignored files");
     statusCmd->add_flag("--branch", showBranch, "Show branch info");
 
-    // branch-create
+    // branch commands
+    auto branchCmd = app.add_subcommand("branch", "Branch management commands");
+    
+    // branch create
+    std::string branchName;
+    auto createCmd = branchCmd->add_subcommand("create", "Create a new branch");
+    createCmd->add_option("name", branchName, "Name of the new branch")->required();
+    
+    // branch delete
+    std::string deleteBranchName;
+    auto deleteCmd = branchCmd->add_subcommand("delete", "Delete an existing branch");
+    deleteCmd->add_option("name", deleteBranchName, "Name of the branch to delete")->required();
+    
+    // branch list
+    auto listCmd = branchCmd->add_subcommand("list", "List all branches");
+    
+    // branch checkout
+    std::string checkoutBranchName;
+    auto checkoutCmd = branchCmd->add_subcommand("checkout", "Switch to a different branch");
+    checkoutCmd->add_option("name", checkoutBranchName, "Name of the branch to switch to")->required();
+
+    // branch rename
+    std::string oldBranchName, newBranchName;
+    auto renameCmd = branchCmd->add_subcommand("rename", "Rename an existing branch");
+    renameCmd->add_option("old-name", oldBranchName, "Current name of the branch")->required();
+    renameCmd->add_option("new-name", newBranchName, "New name for the branch")->required();
+
+    // branch merge
+    std::string mergeBranchName;
+    auto mergeCmd = branchCmd->add_subcommand("merge", "Merge another branch into current branch");
+    mergeCmd->add_option("name", mergeBranchName, "Name of the branch to merge")->required();
+
+    // branch reset
+    std::string resetBranchName, resetCommitHash;
+    auto resetCmd = branchCmd->add_subcommand("reset", "Reset branch to specified commit");
+    resetCmd->add_option("name", resetBranchName, "Name of the branch to reset")->required();
+    resetCmd->add_option("commit-hash", resetCommitHash, "Commit hash to reset to")->required();
+
+    // branch rebase
+    std::string rebaseBranchName, ontoBranchName;
+    auto rebaseCmd = branchCmd->add_subcommand("rebase", "Rebase current branch onto another branch");
+    rebaseCmd->add_option("name", rebaseBranchName, "Name of the branch to rebase")->required();
+    rebaseCmd->add_option("onto", ontoBranchName, "Name of the branch to rebase onto")->required();
+
+    // Initialize branch manager after command registration
+    BranchManager branchManager;
+    
+    app.callback([&branchManager, &branchName, &deleteBranchName, &checkoutBranchName, &lsHash, &lsTreeHash, &catHash, &catP, &catT, &catS, &shortFormat, &showUntracked, &showIgnore, &showBranch, &addCommandPaths, &oldBranchName, &newBranchName, &mergeBranchName, &resetBranchName, &resetCommitHash, &rebaseBranchName, &ontoBranchName]() {
+        // Handle branch commands
+        if (branchCmd->parsed()) {
+            if (createCmd->parsed()) {
+                branchManager.createBranch(branchName);
+            } else if (deleteCmd->parsed()) {
+                branchManager.deleteBranch(deleteBranchName);
+            } else if (listCmd->parsed()) {
+                branchManager.listBranches();
+            } else if (checkoutCmd->parsed()) {
+                branchManager.checkoutBranch(checkoutBranchName);
+            } else if (renameCmd->parsed()) {
+                branchManager.renameBranch(oldBranchName, newBranchName);
+            } else if (mergeCmd->parsed()) {
+                branchManager.mergeBranch(mergeBranchName);
+            } else if (resetCmd->parsed()) {
+                branchManager.resetBranch(resetBranchName, resetCommitHash);
+            } else if (rebaseCmd->parsed()) {
+                branchManager.rebaseBranch(rebaseBranchName, ontoBranchName);
+            }
+        }
+        // ... rest of the callbacks
+    });
     std::string branchName;
     auto branchCreateCmd = app.add_subcommand("branch-create", "Create a new branch");
     branchCreateCmd->add_option("name", branchName, "Name of the new branch")->required();
@@ -250,7 +319,10 @@ int main(int argc, char** argv) {
     } else {
         std::cerr << "Failed to switch to branch '" << branchToCheckout << "'\n";
     }
-    }else {
+    } 
+    else if (*branchDeleteCmd) {
+    branchManager.deleteBranch(branchToDelete);}
+    else {
         std::cout << app.help() << "\n";
     }
 

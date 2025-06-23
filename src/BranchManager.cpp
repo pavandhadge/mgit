@@ -1,7 +1,9 @@
 #include "headers/BranchManager.hpp"
+#include "headers/GitCommit.hpp"
 #include <fstream>
 #include <iostream>
-// #include <filesystem>
+#include <map>
+#include <string>
 
 BranchManager::BranchManager() {
     loadBranches();
@@ -84,7 +86,6 @@ bool BranchManager::checkoutBranch(const std::string& name) {
 
     std::string targetHash = branches[name];
 
-    // You may choose to load this commit into the working directory here
     std::ofstream headCommit(".mgit/HEAD_COMMIT");
     if (headCommit.is_open()) {
         headCommit << targetHash << "\n";
@@ -113,20 +114,125 @@ std::string BranchManager::getBranchHead(const std::string& name) const {
     return "";
 }
 
-//Branch deletion
+// Branch operations
+bool BranchManager::renameBranch(const std::string& oldName, const std::string& newName) {
+    if (oldName == newName) {
+        std::cerr << "Error: New name is the same as old name.\n";
+        return false;
+    }
+
+    if (branches.find(oldName) == branches.end()) {
+        std::cerr << "Error: Branch '" << oldName << "' does not exist.\n";
+        return false;
+    }
+
+    if (branches.find(newName) != branches.end()) {
+        std::cerr << "Error: Branch '" << newName << "' already exists.\n";
+        return false;
+    }
+
+    auto commitHash = branches[oldName];
+    branches.erase(oldName);
+    branches[newName] = commitHash;
+
+    if (oldName == currentBranch) {
+        currentBranch = newName;
+    }
+
+    saveBranches();
+    std::cout << "Successfully renamed branch '" << oldName << "' to '" << newName << "'\n";
+    return true;
+}
+
+bool BranchManager::mergeBranch(const std::string& branchName) {
+    if (branches.find(branchName) == branches.end()) {
+        std::cerr << "Error: Branch '" << branchName << "' does not exist.\n";
+        return false;
+    }
+
+    if (branchName == currentBranch) {
+        std::cerr << "Error: Cannot merge branch into itself.\n";
+        return false;
+    }
+
+    std::string sourceHash = branches[branchName];
+    std::string targetHash = branches[currentBranch];
+
+    // TODO: Implement merge logic here
+    // This would involve:
+    // 1. Finding common ancestor
+    // 2. Creating merge commit
+    // 3. Updating current branch
+    
+    std::cout << "Merge of branch '" << branchName << "' into current branch not implemented yet.\n";
+    return false;
+}
+
+bool BranchManager::resetBranch(const std::string& branchName, const std::string& commitHash) {
+    if (branches.find(branchName) == branches.end()) {
+        std::cerr << "Error: Branch '" << branchName << "' does not exist.\n";
+        return false;
+    }
+
+    if (branchName == currentBranch) {
+        std::cerr << "Warning: Resetting current branch.\n";
+    }
+
+    branches[branchName] = commitHash;
+    saveBranches();
+    std::cout << "Successfully reset branch '" << branchName << "' to commit " << commitHash << "\n";
+    return true;
+}
+
+bool BranchManager::rebaseBranch(const std::string& branchName, const std::string& ontoBranchName) {
+    if (branches.find(branchName) == branches.end()) {
+        std::cerr << "Error: Branch '" << branchName << "' does not exist.\n";
+        return false;
+    }
+
+    if (branches.find(ontoBranchName) == branches.end()) {
+        std::cerr << "Error: Branch '" << ontoBranchName << "' does not exist.\n";
+        return false;
+    }
+
+    if (branchName == ontoBranchName) {
+        std::cerr << "Error: Cannot rebase onto the same branch.\n";
+        return false;
+    }
+
+    if (branchName == currentBranch) {
+        std::cerr << "Warning: Rebasing current branch.\n";
+    }
+
+    // TODO: Implement rebase logic here
+    // This would involve:
+    // 1. Finding common ancestor
+    // 2. Creating new commits on top of target branch
+    // 3. Updating branch pointer
+    
+    std::cout << "Rebase of branch '" << branchName << "' onto '" << ontoBranchName << "' not implemented yet.\n";
+    return false;
+}
+
+// Branch deletion
 bool BranchManager::deleteBranch(const std::string& name) {
     if (branches.find(name) == branches.end()) {
-        std::cerr << "Branch '" << name << "' does not exist.\n";
+        std::cerr << "Error: Branch '" << name << "' does not exist.\n";
         return false;
     }
 
     if (name == currentBranch) {
-        std::cerr << "Cannot delete the currently checked out branch '" << name << "'.\n";
+        std::cerr << "Error: Cannot delete the currently checked out branch '" << name << "'.\n";
         return false;
+    }
+
+    const std::string& commitHash = branches[name];
+    if (commitHash.empty()) {
+        std::cerr << "Warning: Branch '" << name << "' has no commits.\n";
     }
 
     branches.erase(name);
     saveBranches();
-    std::cout << "Deleted branch '" << name << "'\n";
+    std::cout << "Successfully deleted branch '" << name << "'\n";
     return true;
 }
