@@ -1,5 +1,6 @@
-#include "headers/BranchManager.hpp"
+#include "headers/GitBranch.hpp"
 #include "headers/GitHead.hpp"
+#include "headers/GitIndex.hpp"
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -41,6 +42,24 @@ std::string Branch::getCurrentBranch()const {
     return head.getBranch() ;
 }
 
+ bool Branch::deleteBranch(const std::string &branchName){
+     std::string path = headsDir+branchName;
+     if(!std::filesystem::exists(path)){
+         std::cerr<<"no such branch exist"<<std::endl;
+         return false;
+     }
+     if(getCurrentBranch() == branchName){
+         IndexManager idx;
+         std::vector<std::pair<std::string, std::string>> changelist = idx.computeStatus();
+         if(changelist.size() !=0){
+             std::cerr<<"uncommited changes . commit changes to delete this branch. merge required."<<std::endl;
+             return false;
+         }
+         //here add logic to check if merged or not and then delte
+     }
+     std::filesystem::remove(path);
+     return true;
+}
 std::vector<std::string> Branch::listBranches() const{
     std::vector<std::string> branchList;
     for(const auto& entity : std::filesystem::directory_iterator(headsDir) ){
@@ -52,6 +71,21 @@ std::vector<std::string> Branch::listBranches() const{
     return branchList;
 }
 
+bool Branch::renameBranch(const std::string& oldName, const std::string& newName){
+    std::string path = headsDir + oldName;
+     std::string newPath = headsDir + newName;
+   if(!std::filesystem::exists(path)){
+       std::cerr<<"no such branch exist"<<std::endl;
+       return false;
+   }
+   std::string currentBranch = getCurrentBranch();
+   if(currentBranch == oldName){
+       gitHead head ;
+       head.writeHeadToHeadOfNewBranch(newName);
+   }
+   std::filesystem::rename(path , newPath);
+   return true;
+}
 std::string Branch::getCurrentBranchHash() const{
     gitHead head ;
     return head.getBranchHeadHash() ;

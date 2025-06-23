@@ -15,21 +15,26 @@ public :
     std::string writeObject(GitObjectType type, const std::string& path , const bool &write);
 
     // For commit:
-    std::string writeObject(GitObjectType type,
-        const std::string& currentHash,
-                             const std::string& parentHash,
-                             const std::string& commitMessage,
-                             const std::string& author = "");
+    std::string writeObject(GitObjectType type, const CommitData& data);
 
     // For tag:
-    std::string writeObject(GitObjectType type,
-        const std::string& targetHash,
-                             const std::string& targetType,
-                             const std::string& tagName,
-                             const std::string& tagMessage,
-                             const std::string& taggerLine);
+    std::string writeObject(GitObjectType type, const TagData& data);
      std::string readObject(const GitObjectType type , const std::string& hash);
 
      std::string readObjectRaw(const std::string &path);
  void indexHandler(const std::vector<std::string> &paths={"."});
+
+ void CreateBranch(const std::string &branchName);
+ void listbranches(const std::string &branchName);
+ std::string getCurrentBranch()const ;
+
+ void changeCurrentBranch(const std::string &targetBranch , bool createflag);
+
+ std::string getHashOfBranchHead(const std::string &branchName);
+
+ bool deleteBranch(const std::string &branchName);
+
+ bool renameBranch(const std::string& oldName, const std::string& newName);
+ bool isFullyMerged(std::string branchName);
+
 };

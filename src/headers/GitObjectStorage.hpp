@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 enum class GitObjectType {
     Blob,
@@ -8,6 +9,33 @@ enum class GitObjectType {
         Tag,
         Unknown
 };
+struct CommitData {
+    std::string tree;
+    std::vector<std::string> parents;
+    std::string author;
+    std::string committer;
+    std::string message;
+};
+struct TagData {
+    std::string objectHash;   // SHA of the object being tagged
+    std::string objectType;   // "commit", "tree", "blob"
+    std::string tagName;      // e.g., "v1.0"
+    std::string tagger;       // Full tagger line: "Name <email> timestamp +timezone"
+    std::string message;      // The tag message
+};
+
+// Struct for Blob content
+struct BlobData {
+    std::string content;
+};
+
+// Struct for Tree entry
+struct TreeEntry {
+    std::string mode;
+    std::string filename;
+    std::string hash;
+};
+
 class GitObjectStorage{
   public :
   std::string writeObject( const std::string& content );
@@ -26,73 +54,52 @@ class GitObjectStorage{
 class BlobObject : public GitObjectStorage {
 private:
     GitObjectType type;
-    std::string content;
+    BlobData content;
 public:
     BlobObject();
 
-    std::string writeObject(const std::string& path,const bool &write);   // Reads file and stores blob
-    std::string readObject(const std::string& hash);    // Reads blob from disk
-    const std::string& getContent() const;
+    std::string writeObject(const std::string& path, const bool& write); // Reads file and stores blob
+    BlobData readObject(const std::string& hash);                        // Reads blob from disk
+    const BlobData& getContent() const;
     GitObjectType getType() const;
 };
+
+class TreeObject : public GitObjectStorage {
+private:
+    GitObjectType type;
+    std::vector<TreeEntry> content;
+public:
+    TreeObject();
+
+    std::string writeObject(const std::string& path);
+    std::vector<TreeEntry> readObject(const std::string& hash);
+    const std::vector<TreeEntry>& getContent() const;
+    GitObjectType getType() const;
+};
+
 
 
 class CommitObject:public GitObjectStorage{
     private :
     GitObjectType type ;
-    std::string content;
+    CommitData content;
     public :
-    std::string writeObject(const std::string& currentHash ,const std::string& parentHash ,const std::string &commitMassage,const std::string &author="");
-
-  std::string readObject(const std::string& hash);
-  const std::string& getContent() const;
+    std::string writeObject(const CommitData& data) ;
+    CommitData readObject(const std::string& hash);
+  const CommitData& getContent() const;
      GitObjectType getType() const;
   CommitObject();
 };
-class TreeObject:public GitObjectStorage{
-    private :
-    GitObjectType type ;
-    std::string content;
-    public :
-    std::string writeObject( const std::string& path);
-    const std::string& getContent() const;
-       GitObjectType getType() const;
-    TreeObject();
 
-  std::string readObject(const std::string& hash);
-};
 class TagObject:public GitObjectStorage{
     private :
     GitObjectType type ;
-    std::string content;
+    TagData content;
     public :
-    std::string writeObject(const std::string& targetHash,
-                                       const std::string& targetType,
-                                       const std::string& tagName,
-                                       const std::string& tagMessage,
-                                       const std::string& taggerLine);
-    const std::string& getContent() const;
+    std::string writeObject(const TagData& data);
+    const TagData getContent() const ;
        GitObjectType getType() const;
 
-  std::string readObject(const std::string& hash);
+       TagData readObject(const std::string& hash);
   TagObject();
 };
-
-/*
- * use following the blob or other codes
- *         std::ifstream file(path, std::ios::binary);
- if (!file.is_open()) {
-     std::cerr << "Error: Unable to open file: " << path << "\n";
-     return EXIT_FAILURE;
- }
-
- std::ostringstream buffer;
- buffer << file.rdbuf();
- std::string fileData = buffer.str();
- file.close();
-
- std::string blobHeader = "blob " + std::to_string(fileData.size()) + '\0';
- std::string fullBlob = blobHeader + fileData;
- *
- *
- */
