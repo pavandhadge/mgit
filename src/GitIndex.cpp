@@ -3,12 +3,15 @@
 #include "headers/HashUtils.hpp"
 #include "headers/ZlibUtils.hpp"
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 #include <sstream>
 #include <filesystem>
 #include "headers/GitIndex.hpp"
 #include "headers/GitObjectStorage.hpp"
-
+// #include <pair>
 IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
     IndexEntry newEntry;
 
@@ -137,4 +140,57 @@ void IndexManager::printEntries() const {
                   << ", Path: " << entry.path
                   << ", Hash (hex): " << binaryToHex(entry.hash) << "\n";
     }
+}
+
+std::vector<std::pair<std::string, std::string>> IndexManager::status() {
+    std::vector<std::pair<std::string, std::string>> changeRecords;
+
+    // Step 1: Load index
+    readIndex();
+
+    std::unordered_map<std::string, std::string> indexedHashes;
+    for (const auto& entry : entries) {
+        indexedHashes[entry.path] = entry.hash;
+    }
+
+    std::unordered_set<std::string> visited;
+
+    for (const auto& file : std::filesystem::recursive_directory_iterator(".", std::filesystem::directory_options::skip_permission_denied)) {
+        std::string pathStr = file.path().string();
+
+        // 🔥 Skip .git folder and its contents
+        if (pathStr == ".git" ||
+                    pathStr.substr(0, 5) == ".git/" ||
+                    pathStr.find("/.git/") != std::string::npos ||
+                    pathStr.find("\\.git\\") != std::string::npos) {
+                    continue;
+                }
+
+        if (!file.is_regular_file()) continue;
+
+        visited.insert(pathStr);
+
+        auto it = indexedHashes.find(pathStr);
+        if (it == indexedHashes.end()) {
+            changeRecords.push_back({"untracked:", pathStr});
+            continue;
+        }
+
+        BlobObject obj;
+        std::string currHash =obj.writeObject(pathStr, false);
+
+        if (currHash != it->second) {
+            changeRecords.push_back({"modified:", pathStr});
+        }
+
+        // Mark as handled
+        indexedHashes.erase(it);
+    }
+
+    // Remaining = deleted
+    for (const auto& [missingPath, _] : indexedHashes) {
+        changeRecords.push_back({"deleted:", missingPath});
+    }
+
+    return changeRecords;
 }

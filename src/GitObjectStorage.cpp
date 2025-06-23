@@ -57,12 +57,12 @@ std::string GitObjectStorage::writeObject(const std::string &content ){
         outFile.write(compressed.data(), compressed.size());
         outFile.close();
         return hash;
-}catch(const std::exception &e){
-    std::cout<<"exception occured at GitObjectStorage::WriteObject : "<<e.what()<<std::endl;
-    return "";
+    }catch(const std::exception &e){
+        std::cout<<"exception occured at GitObjectStorage::WriteObject : "<<e.what()<<std::endl;
+        return "";
+    }
 }
-}
-    std::string GitObjectStorage::readObject(const std::string& hash){
+std::string GitObjectStorage::readObject(const std::string& hash){
 
         try {
             std::string path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
@@ -88,23 +88,23 @@ std::string GitObjectStorage::writeObject(const std::string &content ){
             std::cout<<"exception occured at GitObjectStorage::readObject : "<<e.what()<<std::endl;
             return "";
         }
-   }
+}
 
 
-  std::string GitObjectStorage::objectTypeToString(GitObjectType type) {
-      switch (type) {
-          case GitObjectType::Blob: return "blob";
-          case GitObjectType::Tree: return "tree";
-          case GitObjectType::Commit: return "commit";
-          case GitObjectType::Tag: return "tag";
-          default: return "unknown";
-      }
-  }
+std::string GitObjectStorage::objectTypeToString(GitObjectType type) {
+    switch (type) {
+        case GitObjectType::Blob: return "blob";
+        case GitObjectType::Tree: return "tree";
+        case GitObjectType::Commit: return "commit";
+        case GitObjectType::Tag: return "tag";
+        default: return "unknown";
+    }
+}
 
-  GitObjectType GitObjectStorage::parseGitObjectTypeFromString(const std::string& typeStr) {
-      if (typeStr == "blob") return GitObjectType::Blob;
-      if (typeStr == "tree") return GitObjectType::Tree;
-      if (typeStr == "commit") return GitObjectType::Commit;
-      if (typeStr == "tag") return GitObjectType::Tag;
-      return GitObjectType::Unknown;
-  }
+GitObjectType GitObjectStorage::parseGitObjectTypeFromString(const std::string& typeStr) {
+    if (typeStr == "blob") return GitObjectType::Blob;
+    if (typeStr == "tree") return GitObjectType::Tree;
+    if (typeStr == "commit") return GitObjectType::Commit;
+    if (typeStr == "tag") return GitObjectType::Tag;
+    return GitObjectType::Unknown;
+}

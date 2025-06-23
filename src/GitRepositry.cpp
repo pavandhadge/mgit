@@ -111,3 +111,9 @@ std::string GitRepository::readObjectRaw(const std::string& path){
 
      idx.writeIndex();
  }
+
+ std::string GitRepository::status(){
+     IndexManager idx;
+     idx.status();
+
+ }
