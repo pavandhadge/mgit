@@ -36,5 +36,6 @@ public :
 
  bool renameBranch(const std::string& oldName, const std::string& newName);
  bool isFullyMerged(const std::string& branchName);
-
+bool createCommit( const std::string& message,const std::string& author);
+std::vector<std::string> logBranchCommitHistory(const std::string &branchName);
 };
