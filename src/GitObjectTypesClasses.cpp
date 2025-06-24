@@ -146,6 +146,33 @@ GitObjectType TreeObject::getType() const {
     return type;
 }
 
+bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash, const std::string &path) {
+    std::vector<TreeEntry> entities = readObject(hash);
+
+    for (const TreeEntry &entity : entities) {
+        std::string fullPath = path + "/" + entity.filename;
+
+        if (entity.mode == "100644" || entity.mode == "100755") {
+            // It's a file (blob)
+            BlobObject blobObj;
+            BlobData blob = blobObj.readObject(entity.hash);
+
+            std::filesystem::create_directories(std::filesystem::path(fullPath).parent_path());
+
+            std::ofstream outFile(fullPath, std::ios::binary);
+            outFile << blob.content;
+            outFile.close();
+        } else if (entity.mode == "040000") {
+            // It's a subdirectory (tree)
+            std::filesystem::create_directories(fullPath);
+
+            TreeObject subtree;
+            subtree.restoreWorkingDirectoryFromTreeHash(entity.hash, fullPath);  // 🔁 recursive
+        }
+    }
+
+    return true;
+}
 
 
 

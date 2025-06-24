@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -70,7 +71,7 @@ private:
     std::vector<TreeEntry> content;
 public:
     TreeObject();
-
+    bool restoreWorkingDirectoryFromTreeHash(const std::string &hash,const  std::string &path);
     std::string writeObject(const std::string& path);
     std::vector<TreeEntry> readObject(const std::string& hash);
     const std::vector<TreeEntry>& getContent() const;

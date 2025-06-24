@@ -17,7 +17,7 @@ public:
     void readIndex();             // Populates entries and map
     void writeIndex();            // Writes vector entries to disk
     void addOrUpdateEntry(const IndexEntry& entry);
-    const std::vector<IndexEntry>& getEntries() const;   // ← This is your return
+    const std::vector<IndexEntry>& getEntries() ;   // ← This is your return
     void printEntries() const;
     std::vector<std::pair<std::string, std::string>> computeStatus();
     IndexEntry gitIndexEntryFromPath(const std::string &path);
