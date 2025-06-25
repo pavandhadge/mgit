@@ -40,4 +40,5 @@ public :
  bool createCommit( const std::string& message,const std::string& author);
  std::unordered_set<std::string> logBranchCommitHistory(const std::string &branchName);
     bool gotoStateAtPerticularCommit(const std::string& hash);
+    bool exportHeadAsZip(const std::string& branchName, const std::string& outputZipPath);
 };

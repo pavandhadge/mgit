@@ -298,4 +298,41 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string& hash) {
     return true;
 }
 
-//add function where u take the repo back to the point where the commit was done
+bool GitRepository::exportHeadAsZip(const std::string& branchName, const std::string& outputZipPath) {
+    // Step 1: Get HEAD commit hash of the branch
+    std::string commitHash = getHashOfBranchHead(branchName);
+    if (commitHash.empty()) {
+        std::cerr << "Branch '" << branchName << "' does not exist.\n";
+        return false;
+    }
+
+    // Step 2: Get tree hash from the commit
+    CommitObject commitObj;
+    CommitData commitData = commitObj.readObject(commitHash);
+    std::string treeHash = commitData.tree;
+
+    // Step 3: Create a temporary export directory
+    std::string tempDir = ".mgit_export_tmp";
+    std::filesystem::remove_all(tempDir);  // Clean previous export if exists
+    std::filesystem::create_directory(tempDir);
+
+    // Step 4: Restore working tree using existing recursive function
+    TreeObject treeObj;
+    std::unordered_set<std::string> filePaths;
+    treeObj.restoreTreeContents(treeHash, tempDir, filePaths);
+
+    // Step 5: Zip the restored folder
+    std::string zipCommand = "zip -r " + outputZipPath + " " + tempDir;
+    int result = std::system(zipCommand.c_str());
+
+    if (result != 0) {
+        std::cerr << "Failed to create zip archive.\n";
+        return false;
+    }
+
+    // Step 6: Cleanup
+    std::filesystem::remove_all(tempDir);
+
+    std::cout << "✅ Successfully exported HEAD of '" << branchName << "' to " << outputZipPath << "\n";
+    return true;
+}
