@@ -198,34 +198,42 @@ void handleMergeCommand(GitRepository& repo, const std::string& targetBranch) {
         return;
     }
 
-    if (!repo.isFullyMerged(targetBranch)) {
-        std::cerr << "Error: The branch '" << targetBranch << "' is not fully merged.\n";
-        std::cerr << "Use 'git merge --no-ff' to create a merge commit\n";
-        return;
-    }
-
-    // Get current branch head
-    std::string currentHead = repo.getHashOfBranchHead(repo.getCurrentBranch());
-    std::string targetHead = repo.getHashOfBranchHead(targetBranch);
-
-    // Fast-forward merge
-    if (currentHead.empty() || targetHead.empty()) {
-        std::cerr << "Error: One or both branches have no commits\n";
-        return;
-    }
-
-    // Update current branch to target branch head
-    if (repo.updateBranchHead(repo.getCurrentBranch(), targetHead)) {
-        std::cout << "Fast-forward merge successful\n";
-    } else {
-        std::cerr << "Error: Failed to update branch head\n";
+    if (!repo.mergeBranch(targetBranch)) {
+        repo.reportMergeConflicts(targetBranch);
     }
 }
 
+void handleMergeContinue(GitRepository& repo) {
+    if (!repo.resolveConflicts("")) {
+        repo.reportMergeConflicts("");
+        return;
+    }
 
+    // Create merge commit
+    std::string message = "Merge branch '" + repo.getCurrentBranch() + "'";
+    std::string author = GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone();
+    std::string hash = repo.createMergeCommit(message, author);
 
+    if (hash.empty()) {
+        std::cerr << "Error creating merge commit\n";
+        return;
+    }
 
+    // Update HEAD
+    gitHead head;
+    head.updateHead(hash);
 
+    std::cout << "Merge successful. Created merge commit: " << hash << "\n";
+}
+
+void handleMergeAbort(GitRepository& repo) {
+    repo.abortMerge();
+    std::cout << "Merge aborted.\n";
+}
+
+void handleMergeStatus(GitRepository& repo) {
+    repo.reportMergeConflicts("");
+}
 
 void setupCLIAppHelp(CLI::App& app){
     if (app.get_subcommands().empty()) {
@@ -408,8 +416,44 @@ void setupMergeCommand(CLI::App& app, GitRepository& repo) {
     });
 }
 
+void setupMergeContinueCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-continue", "Complete a merge after conflicts are resolved");
+    cmd->callback([&repo]() {
+        handleMergeContinue(repo);
+    });
+}
+
+void setupMergeAbortCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-abort", "Abort a merge in progress");
+    cmd->callback([&repo]() {
+        handleMergeAbort(repo);
+    });
+}
+
+void setupMergeStatusCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-status", "Show merge conflicts status");
+    cmd->callback([&repo]() {
+        handleMergeStatus(repo);
+    });
+}
+
+void setupResolveConflictCommand(CLI::App& app, GitRepository& repo) {
+    std::string path, hash;
+    auto cmd = app.add_subcommand("resolve-conflict", "Resolve a merge conflict");
+    cmd->add_option("path", path, "Path of the conflicting file")
+        ->required()
+        ->type_name("PATH");
+    cmd->add_option("hash", hash, "Hash of the version to keep")
+        ->required()
+        ->type_name("HASH");
+    cmd->callback([&repo, path, hash]() {
+        handleResolveConflict(repo, path, hash);
+    });
+}
+
 // ==================== MAIN APP SETUP ====================
 void setupAllCommands(CLI::App& app, GitRepository& repo) {
+    setupCLIAppHelp(app);
     setupInitCommand(app, repo);
     setupHashObjectCommand(app, repo);
     setupWriteTreeCommand(app, repo);
@@ -424,5 +468,9 @@ void setupAllCommands(CLI::App& app, GitRepository& repo) {
     setupBranchCommand(app, repo);
     setupSwitchCommand(app, repo);
     setupCheckoutCommand(app, repo);
-    setupCLIAppHelp(app);
+    setupMergeCommand(app, repo);
+    setupMergeContinueCommand(app, repo);
+    setupMergeAbortCommand(app, repo);
+    setupMergeStatusCommand(app, repo);
+    setupResolveConflictCommand(app, repo);
 }

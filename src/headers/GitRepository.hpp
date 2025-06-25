@@ -2,12 +2,22 @@
 #include <string>
 #include <memory.h>
 #include "GitObjectStorage.hpp"
+#include "GitMerge.hpp"
 #include <vector>
 #include <unordered_set>
+#include <optional>
+
 class GitRepository{
   private :
   std::string gitDir;
+  GitMerge merge;
       // std::unique_ptr<GitObjectStore> objectStore;
+
+  // Helper methods
+  std::string createMergeCommit(const std::string& message, const std::string& author,
+                              const std::string& currentCommit, const std::string& targetCommit);
+  bool resolveConflicts(const std::string& targetBranch);
+
 public :
  void reportStatus(bool shortFormat = false, bool showUntracked = true);
     GitRepository(const std::string& root = ".git");
@@ -41,4 +51,13 @@ public :
  std::unordered_set<std::string> logBranchCommitHistory(const std::string &branchName);
     bool gotoStateAtPerticularCommit(const std::string& hash);
     bool exportHeadAsZip(const std::string& branchName, const std::string& outputZipPath);
+
+    // Merge operations
+    bool mergeBranch(const std::string& targetBranch);
+    bool abortMerge();
+    std::vector<std::string> getConflictingFiles();
+    bool isConflicted(const std::string& path);
+    void resolveConflict(const std::string& path, const std::string& hash);
+    std::optional<ConflictMarker> getConflictMarker(const std::string& path);
+    void reportMergeConflicts(const std::string& targetBranch);
 };
