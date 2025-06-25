@@ -119,7 +119,8 @@ void IndexManager::writeIndex() {
 }
 
 
-const std::vector<IndexEntry>& IndexManager::getEntries()const {
+const std::vector<IndexEntry>& IndexManager::getEntries() {
+    readIndex();
     return entries;
 }
 

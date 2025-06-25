@@ -63,6 +63,7 @@ void gitHead::updateHead(const std::string& newCommitHash) {
     // Update internal cache
     branchHeadHash = newCommitHash;
 }
+
 void gitHead::writeHeadToHeadOfNewBranch(const std::string& branchName) {
     std::string headPath = ".git/HEAD";
     std::ofstream headFile(headPath, std::ios::trunc);

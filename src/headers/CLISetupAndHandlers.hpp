@@ -38,6 +38,7 @@ void handleCheckoutBranch(GitRepository& repo, const std::string& branchName, bo
 void setupAllCommands(CLI::App& app, GitRepository& repo);
 
 // Command setup functions
+void setupCLIAppHelp(CLI::App& app);
 void setupInitCommand(CLI::App& app, GitRepository& repo);
 void setupHashObjectCommand(CLI::App& app, GitRepository& repo);
 void setupWriteTreeCommand(CLI::App& app, GitRepository& repo);

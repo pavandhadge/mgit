@@ -191,7 +191,12 @@ void handleCheckoutBranch(GitRepository& repo, const std::string& branchName, bo
 
 
 
-
+void setupCLIAppHelp(CLI::App& app){
+    if (app.get_subcommands().empty()) {
+           std::cout << app.help() << "\n";
+           std::exit(0);
+       }
+}
 // ===================== INITIALIZATION =====================
 void setupInitCommand(CLI::App& app, GitRepository& repo) {
     std::string initPath = ".git";
@@ -374,4 +379,5 @@ void setupAllCommands(CLI::App& app, GitRepository& repo) {
     setupBranchCommand(app, repo);
     setupSwitchCommand(app, repo);
     setupCheckoutCommand(app, repo);
+    setupCLIAppHelp(app);
 }

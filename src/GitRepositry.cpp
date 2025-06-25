@@ -1,12 +1,15 @@
+#include "headers/GitConfig.hpp"
 #include "headers/GitHead.hpp"
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/GitInit.hpp"
 #include <iostream>
+#include <unordered_set>
 #include <vector>
 #include <filesystem>
 #include "headers/GitIndex.hpp"
 #include "headers/GitBranch.hpp"
+#include "headers/ZlibUtils.hpp"
 
 GitRepository::GitRepository(const std::string& root) : gitDir(root) {}
 
@@ -200,3 +203,99 @@ bool GitRepository::renameBranch(const std::string& oldName, const std::string& 
     Branch branchObj;
     return branchObj.renameBranch(oldName,newName);
 }
+
+bool GitRepository::isFullyMerged(const std::string& branchName){
+    return true;
+}
+
+
+bool GitRepository::createCommit( const std::string& message,const std::string& author) {
+    CommitData data;
+    data.tree = writeObject(GitObjectType::Tree , ".",true);
+
+    std::string parent= getHashOfBranchHead(getCurrentBranch());
+    if (!parent.empty()) {
+        data.parents.push_back(parent);
+    }
+
+    data.author = author.empty()
+                ? GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone()
+                : author;
+
+    data.committer = GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone();
+    data.message = message;
+
+    std::string hash = writeObject(GitObjectType::Commit, data);
+    std::cout << "Commit object written: " << hash << "\n";
+
+    gitHead head;
+    head.updateHead(hash);
+    return true;
+}
+
+std::unordered_set<std::string> GitRepository::logBranchCommitHistory(const std::string &branchName){
+    std::string currHash = getHashOfBranchHead(branchName);
+    std::unordered_set<std::string> commitList;
+
+    CommitObject commitObj;
+
+    while(!currHash.empty()){
+        commitList.insert(currHash);
+        CommitData commit = commitObj.readObject(currHash);
+
+        if(commit.parents.empty()) {
+            break;
+        }
+
+        currHash = commit.parents[0]; // walk to first parent
+    }
+
+    return commitList;
+}
+
+bool GitRepository::gotoStateAtPerticularCommit(const std::string& hash) {
+    std::string path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
+    if (!std::filesystem::exists(path)) {
+        std::cerr << "No such commit exists. Ensure it is part of the current branch.\n";
+        return false;
+    }
+
+    std::unordered_set<std::string> commitListInCurrentBranch(
+        logBranchCommitHistory(getCurrentBranch()).begin(),
+        logBranchCommitHistory(getCurrentBranch()).end()
+    );
+    if (commitListInCurrentBranch.find(hash) == commitListInCurrentBranch.end()) {
+        std::cerr << "Commit is not part of current branch history.\n";
+        return false;
+    }
+
+    IndexManager idx;
+    if (!idx.computeStatus().empty()) {
+        std::cerr << "Untracked or modified changes exist. Please commit/stash them before reset.\n";
+        return false;
+    }
+
+    CommitObject commitObj;
+    CommitData commit = commitObj.readObject(hash);
+
+    // Recursively clear current directory (except .git)
+    for (auto& entry : std::filesystem::directory_iterator(".")) {
+        if (entry.path().filename() != ".git") {
+            std::filesystem::remove_all(entry);
+        }
+    }
+
+    // Recursively checkout commit's tree into working directory
+    // //yet to implement
+    TreeObject treeObj;
+    treeObj.restoreWorkingDirectoryFromTreeHash(commit.tree, ".");
+
+    // Update HEAD
+    gitHead head;
+    head.updateHead(hash);
+
+    std::cout << "Repository successfully reset to commit: " << hash << "\n";
+    return true;
+}
+
+//add function where u take the repo back to the point where the commit was done

@@ -3,6 +3,7 @@
 #include <memory.h>
 #include "GitObjectStorage.hpp"
 #include <vector>
+#include <unordered_set>
 class GitRepository{
   private :
   std::string gitDir;
@@ -35,6 +36,8 @@ public :
  bool deleteBranch(const std::string &branchName);
 
  bool renameBranch(const std::string& oldName, const std::string& newName);
- bool isFullyMerged(std::string branchName);
-
+ bool isFullyMerged(const std::string& branchName);
+ bool createCommit( const std::string& message,const std::string& author);
+ std::unordered_set<std::string> logBranchCommitHistory(const std::string &branchName);
+    bool gotoStateAtPerticularCommit(const std::string& hash);
 };
