@@ -99,26 +99,7 @@ void IndexManager::readIndex() {
     }
 }
 
-void IndexManager::writeIndex() {
-    std::string path = ".git/INDEX";
-    std::ofstream index;
-    try {
-        index.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-        index.open(path);
 
-        for (const auto& entry : entries) {
-            index << entry.mode << " " << entry.path << " " << entry.hash << " " 
-                  << entry.base_hash << " " << entry.their_hash << " " 
-                  << static_cast<int>(entry.conflict_state) << " " 
-                  << entry.conflict_marker << "\n";
-        }
-
-        index.close();
-    } catch (const std::ios_base::failure& e) {
-        std::cerr << "I/O error while writing INDEX file: " << e.what() << "\n";
-        if (index.is_open()) index.close();
-    }
-}
 
 void IndexManager::addOrUpdateEntry(const IndexEntry& entry) {
     auto it = pathToIndex.find(entry.path);
@@ -267,14 +248,19 @@ std::optional<ConflictMarker> IndexManager::getConflictMarker(const std::string&
     return std::nullopt;
 }
 
+
 void IndexManager::writeIndex() {
+    std::string path = ".git/INDEX";
     std::ofstream index;
     try {
         index.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-        index.open(".git/INDEX", std::ios::out | std::ios::trunc);
+        index.open(path);
 
         for (const auto& entry : entries) {
-            index << entry.mode << " " << entry.path << " " << entry.hash << "\n";
+            index << entry.mode << " " << entry.path << " " << entry.hash << " " 
+                  << entry.base_hash << " " << entry.their_hash << " " 
+                  << static_cast<int>(entry.conflict_state) << " " 
+                  << entry.conflict_marker << "\n";
         }
 
         index.close();
@@ -283,7 +269,6 @@ void IndexManager::writeIndex() {
         if (index.is_open()) index.close();
     }
 }
-
 
 const std::vector<IndexEntry>& IndexManager::getEntries() {
     readIndex();
