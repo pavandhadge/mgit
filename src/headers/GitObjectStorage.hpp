@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 enum class GitObjectType {
     Blob,
@@ -75,6 +76,7 @@ public:
     std::string writeObject(const std::string& path);
     std::vector<TreeEntry> readObject(const std::string& hash);
     const std::vector<TreeEntry>& getContent() const;
+    void restoreTreeContents(const std::string &hash, const std::string &path, std::unordered_set<std::string>& treePaths);
     GitObjectType getType() const;
 };
 

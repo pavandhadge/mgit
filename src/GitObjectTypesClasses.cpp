@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <filesystem>
 #include "headers/HashUtils.hpp"
 
@@ -146,14 +147,16 @@ GitObjectType TreeObject::getType() const {
     return type;
 }
 
-bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash, const std::string &path) {
+void TreeObject::restoreTreeContents(const std::string &hash, const std::string &path, std::unordered_set<std::string>& treePaths) {
     std::vector<TreeEntry> entities = readObject(hash);
 
     for (const TreeEntry &entity : entities) {
         std::string fullPath = path + "/" + entity.filename;
+        std::string relativePath = std::filesystem::relative(fullPath, path).string();
+        treePaths.insert(relativePath);
 
         if (entity.mode == "100644" || entity.mode == "100755") {
-            // It's a file (blob)
+            // File (blob)
             BlobObject blobObj;
             BlobData blob = blobObj.readObject(entity.hash);
 
@@ -163,16 +166,30 @@ bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash, co
             outFile << blob.content;
             outFile.close();
         } else if (entity.mode == "040000") {
-            // It's a subdirectory (tree)
+            // Directory (tree)
             std::filesystem::create_directories(fullPath);
+            restoreTreeContents(entity.hash, fullPath, treePaths);  // Recursive call
+        }
+    }
+}
 
-            TreeObject subtree;
-            subtree.restoreWorkingDirectoryFromTreeHash(entity.hash, fullPath);  // 🔁 recursive
+bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash, const std::string &path) {
+    std::unordered_set<std::string> treePaths;
+    restoreTreeContents(hash, path, treePaths);
+
+    // Now, walk the working directory and delete files not in treePaths
+    for (auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+        std::string relativePath = std::filesystem::relative(entry.path(), path).string();
+
+        if (relativePath == ".git") continue;
+        if (treePaths.find(relativePath) == treePaths.end()) {
+            std::filesystem::remove_all(entry.path());
         }
     }
 
     return true;
 }
+
 
 
 
