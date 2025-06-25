@@ -53,3 +53,8 @@ void setupStatusCommand(CLI::App& app, GitRepository& repo);
 void setupBranchCommand(CLI::App& app, GitRepository& repo);
 void setupSwitchCommand(CLI::App& app, GitRepository& repo);
 void setupCheckoutCommand(CLI::App& app, GitRepository& repo);
+void setupMergeCommand(CLI::App& app, GitRepository& repo);
+void setupMergeContinueCommand(CLI::App& app, GitRepository& repo);
+void setupMergeAbortCommand(CLI::App& app, GitRepository& repo);
+void setupMergeStatusCommand(CLI::App& app, GitRepository& repo);
+void setupResolveConflictCommand(CLI::App& app, GitRepository& repo);

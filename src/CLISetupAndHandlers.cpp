@@ -186,10 +186,54 @@ void handleCheckoutBranch(GitRepository& repo, const std::string& branchName, bo
     std::cout << "Switched to branch: " << branchName << "\n";
 }
 
+// ==================== MERGE OPERATIONS ====================
+void handleMergeCommand(GitRepository& repo, const std::string& targetBranch) {
+    if (targetBranch.empty()) {
+        std::cerr << "Error: Target branch name required\n";
+        return;
+    }
 
+    if (repo.getCurrentBranch() == targetBranch) {
+        std::cerr << "Error: Cannot merge branch into itself\n";
+        return;
+    }
 
+    if (!repo.mergeBranch(targetBranch)) {
+        repo.reportMergeConflicts(targetBranch);
+    }
+}
 
+void handleMergeContinue(GitRepository& repo) {
+    if (!repo.resolveConflicts("")) {
+        repo.reportMergeConflicts("");
+        return;
+    }
 
+    // Create merge commit
+    std::string message = "Merge branch '" + repo.getCurrentBranch() + "'";
+    std::string author = GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone();
+    std::string hash = repo.createMergeCommit(message, author);
+
+    if (hash.empty()) {
+        std::cerr << "Error creating merge commit\n";
+        return;
+    }
+
+    // Update HEAD
+    gitHead head;
+    head.updateHead(hash);
+
+    std::cout << "Merge successful. Created merge commit: " << hash << "\n";
+}
+
+void handleMergeAbort(GitRepository& repo) {
+    repo.abortMerge();
+    std::cout << "Merge aborted.\n";
+}
+
+void handleMergeStatus(GitRepository& repo) {
+    repo.reportMergeConflicts("");
+}
 
 void setupCLIAppHelp(CLI::App& app){
     if (app.get_subcommands().empty()) {
@@ -355,16 +399,61 @@ void setupSwitchCommand(CLI::App& app, GitRepository& repo) {
 void setupCheckoutCommand(CLI::App& app, GitRepository& repo) {
     std::string branchName;
     bool createFlag = false;
-    auto cmd = app.add_subcommand("checkout", "Switch branches (legacy command)");
-    cmd->add_option("branch", branchName, "Branch name")->required();
-    cmd->add_flag("-c,--create", createFlag, "Create new branch");
+    auto cmd = app.add_subcommand("checkout", "Switch branches or restore working tree files");
+    cmd->add_option("branch", branchName, "Branch name to switch to")->required();
+    cmd->add_flag("-b", createFlag, "Create and checkout new branch");
     cmd->callback([&repo, branchName, createFlag]() {
         handleCheckoutBranch(repo, branchName, createFlag);
     });
 }
 
+void setupMergeCommand(CLI::App& app, GitRepository& repo) {
+    std::string targetBranch;
+    auto cmd = app.add_subcommand("merge", "Join two or more development histories together");
+    cmd->add_option("branch", targetBranch, "Branch name to merge")->required();
+    cmd->callback([&repo, targetBranch]() {
+        handleMergeCommand(repo, targetBranch);
+    });
+}
+
+void setupMergeContinueCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-continue", "Complete a merge after conflicts are resolved");
+    cmd->callback([&repo]() {
+        handleMergeContinue(repo);
+    });
+}
+
+void setupMergeAbortCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-abort", "Abort a merge in progress");
+    cmd->callback([&repo]() {
+        handleMergeAbort(repo);
+    });
+}
+
+void setupMergeStatusCommand(CLI::App& app, GitRepository& repo) {
+    auto cmd = app.add_subcommand("merge-status", "Show merge conflicts status");
+    cmd->callback([&repo]() {
+        handleMergeStatus(repo);
+    });
+}
+
+void setupResolveConflictCommand(CLI::App& app, GitRepository& repo) {
+    std::string path, hash;
+    auto cmd = app.add_subcommand("resolve-conflict", "Resolve a merge conflict");
+    cmd->add_option("path", path, "Path of the conflicting file")
+        ->required()
+        ->type_name("PATH");
+    cmd->add_option("hash", hash, "Hash of the version to keep")
+        ->required()
+        ->type_name("HASH");
+    cmd->callback([&repo, path, hash]() {
+        handleResolveConflict(repo, path, hash);
+    });
+}
+
 // ==================== MAIN APP SETUP ====================
 void setupAllCommands(CLI::App& app, GitRepository& repo) {
+    setupCLIAppHelp(app);
     setupInitCommand(app, repo);
     setupHashObjectCommand(app, repo);
     setupWriteTreeCommand(app, repo);
@@ -379,5 +468,9 @@ void setupAllCommands(CLI::App& app, GitRepository& repo) {
     setupBranchCommand(app, repo);
     setupSwitchCommand(app, repo);
     setupCheckoutCommand(app, repo);
-    setupCLIAppHelp(app);
+    setupMergeCommand(app, repo);
+    setupMergeContinueCommand(app, repo);
+    setupMergeAbortCommand(app, repo);
+    setupMergeStatusCommand(app, repo);
+    setupResolveConflictCommand(app, repo);
 }

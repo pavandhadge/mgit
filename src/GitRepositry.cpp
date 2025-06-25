@@ -204,8 +204,135 @@ bool GitRepository::renameBranch(const std::string& oldName, const std::string& 
     return branchObj.renameBranch(oldName,newName);
 }
 
-bool GitRepository::isFullyMerged(const std::string& branchName){
+bool GitRepository::isFullyMerged(const std::string& branchName) {
+    // Get current branch and branch to check
+    std::string currentBranch = getCurrentBranch();
+    if (currentBranch == branchName) {
+        std::cerr << "Cannot check merge status of current branch\n";
+        return false;
+    }
+
+    // Get commit histories for both branches
+    std::unordered_set<std::string> currentBranchHistory = logBranchCommitHistory(currentBranch);
+    std::unordered_set<std::string> targetBranchHistory = logBranchCommitHistory(branchName);
+
+    // Check if all commits from target branch are in current branch
+    for (const auto& commit : targetBranchHistory) {
+        if (currentBranchHistory.find(commit) == currentBranchHistory.end()) {
+            // Found a commit in target branch that's not in current branch
+            return false;
+        }
+    }
+
     return true;
+}
+
+void GitRepository::reportMergeConflicts(const std::string& targetBranch) {
+    std::string currentBranch = getCurrentBranch();
+    std::cerr << "Conflicts found during merge:\n";
+    for (const auto& file : merge.getConflictingFiles()) {
+        std::cerr << "- " << file << " (" << merge.getFileConflictStatus(file) << ")\n";
+    }
+    std::cerr << "\nResolve conflicts and run 'git merge --continue' when done\n";
+}
+
+bool GitRepository::mergeBranch(const std::string& targetBranch) {
+    std::string currentBranch = getCurrentBranch();
+    if (currentBranch == targetBranch) {
+        std::cerr << "Cannot merge branch into itself\n";
+        return false;
+    }
+
+    // Get current and target branch heads
+    std::string currentHead = getHashOfBranchHead(currentBranch);
+    std::string targetHead = getHashOfBranchHead(targetBranch);
+
+    if (currentHead.empty() || targetHead.empty()) {
+        std::cerr << "Error: One or both branches have no commits\n";
+        return false;
+    }
+
+    // If fully merged, do fast-forward merge
+    if (isFullyMerged(targetBranch)) {
+        if (updateBranchHead(currentBranch, targetHead)) {
+            std::cout << "Fast-forward merge successful\n";
+            return true;
+        }
+        return false;
+    }
+
+    // Create merge commit
+    std::string message = "Merge branch '" + targetBranch + "'";
+    std::string author = GitConfig().getName() + " <" + GitConfig().getEmail() + "> " + getCurrentTimestampWithTimezone();
+    std::string hash = createMergeCommit(message, author, currentHead, targetHead);
+
+    if (hash.empty()) {
+        std::cerr << "Error creating merge commit\n";
+        return false;
+    }
+
+    // Update HEAD
+    gitHead head;
+    head.updateHead(hash);
+
+    std::cout << "Merge successful. Created merge commit: " << hash << "\n";
+    return true;
+}
+
+bool GitRepository::abortMerge() {
+    IndexManager idx;
+    idx.abortMerge();
+    return true;
+}
+
+std::vector<std::string> GitRepository::getConflictingFiles() {
+    IndexManager idx;
+    return idx.getConflictingFiles();
+}
+
+bool GitRepository::isConflicted(const std::string& path) {
+    IndexManager idx;
+    return idx.isConflicted(path);
+}
+
+void GitRepository::resolveConflict(const std::string& path, const std::string& hash) {
+    IndexManager idx;
+    idx.resolveConflict(path, hash);
+}
+
+std::optional<ConflictMarker> GitRepository::getConflictMarker(const std::string& path) {
+    IndexManager idx;
+    return idx.getConflictMarker(path);
+}
+
+std::string GitRepository::createMergeCommit(const std::string& message, const std::string& author,
+                                           const std::string& currentCommit, const std::string& targetCommit) {
+    CommitData data;
+    data.tree = writeObject(GitObjectType::Tree , ".", true);
+    data.parents.push_back(currentCommit);
+    data.parents.push_back(targetCommit);
+    data.author = author;
+    data.committer = author;
+    data.message = message;
+
+    return writeObject(GitObjectType::Commit, data);
+}
+
+bool GitRepository::resolveConflicts(const std::string& targetBranch) {
+    IndexManager idx;
+    std::vector<std::string> conflicts = idx.getConflictingFiles();
+    
+    if (conflicts.empty()) {
+        return true;
+    }
+
+    std::cout << "Conflicts found:\n";
+    for (const auto& file : conflicts) {
+        std::cout << "- " << file << "\n";
+    }
+
+    std::cout << "\nResolve conflicts and run 'git merge --continue'\n";
+    return false;
 }
 
 
