@@ -204,7 +204,26 @@ bool GitRepository::renameBranch(const std::string& oldName, const std::string& 
     return branchObj.renameBranch(oldName,newName);
 }
 
-bool GitRepository::isFullyMerged(const std::string& branchName){
+bool GitRepository::isFullyMerged(const std::string& branchName) {
+    // Get current branch and branch to check
+    std::string currentBranch = getCurrentBranch();
+    if (currentBranch == branchName) {
+        std::cerr << "Cannot check merge status of current branch\n";
+        return false;
+    }
+
+    // Get commit histories for both branches
+    std::unordered_set<std::string> currentBranchHistory = logBranchCommitHistory(currentBranch);
+    std::unordered_set<std::string> targetBranchHistory = logBranchCommitHistory(branchName);
+
+    // Check if all commits from target branch are in current branch
+    for (const auto& commit : targetBranchHistory) {
+        if (currentBranchHistory.find(commit) == currentBranchHistory.end()) {
+            // Found a commit in target branch that's not in current branch
+            return false;
+        }
+    }
+
     return true;
 }
 

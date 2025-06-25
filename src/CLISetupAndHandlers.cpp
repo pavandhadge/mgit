@@ -186,6 +186,42 @@ void handleCheckoutBranch(GitRepository& repo, const std::string& branchName, bo
     std::cout << "Switched to branch: " << branchName << "\n";
 }
 
+// ==================== MERGE OPERATIONS ====================
+void handleMergeCommand(GitRepository& repo, const std::string& targetBranch) {
+    if (targetBranch.empty()) {
+        std::cerr << "Error: Target branch name required\n";
+        return;
+    }
+
+    if (repo.getCurrentBranch() == targetBranch) {
+        std::cerr << "Error: Cannot merge branch into itself\n";
+        return;
+    }
+
+    if (!repo.isFullyMerged(targetBranch)) {
+        std::cerr << "Error: The branch '" << targetBranch << "' is not fully merged.\n";
+        std::cerr << "Use 'git merge --no-ff' to create a merge commit\n";
+        return;
+    }
+
+    // Get current branch head
+    std::string currentHead = repo.getHashOfBranchHead(repo.getCurrentBranch());
+    std::string targetHead = repo.getHashOfBranchHead(targetBranch);
+
+    // Fast-forward merge
+    if (currentHead.empty() || targetHead.empty()) {
+        std::cerr << "Error: One or both branches have no commits\n";
+        return;
+    }
+
+    // Update current branch to target branch head
+    if (repo.updateBranchHead(repo.getCurrentBranch(), targetHead)) {
+        std::cout << "Fast-forward merge successful\n";
+    } else {
+        std::cerr << "Error: Failed to update branch head\n";
+    }
+}
+
 
 
 
@@ -355,11 +391,20 @@ void setupSwitchCommand(CLI::App& app, GitRepository& repo) {
 void setupCheckoutCommand(CLI::App& app, GitRepository& repo) {
     std::string branchName;
     bool createFlag = false;
-    auto cmd = app.add_subcommand("checkout", "Switch branches (legacy command)");
-    cmd->add_option("branch", branchName, "Branch name")->required();
-    cmd->add_flag("-c,--create", createFlag, "Create new branch");
+    auto cmd = app.add_subcommand("checkout", "Switch branches or restore working tree files");
+    cmd->add_option("branch", branchName, "Branch name to switch to")->required();
+    cmd->add_flag("-b", createFlag, "Create and checkout new branch");
     cmd->callback([&repo, branchName, createFlag]() {
         handleCheckoutBranch(repo, branchName, createFlag);
+    });
+}
+
+void setupMergeCommand(CLI::App& app, GitRepository& repo) {
+    std::string targetBranch;
+    auto cmd = app.add_subcommand("merge", "Join two or more development histories together");
+    cmd->add_option("branch", targetBranch, "Branch name to merge")->required();
+    cmd->callback([&repo, targetBranch]() {
+        handleMergeCommand(repo, targetBranch);
     });
 }
 
