@@ -1,16 +1,28 @@
 #pragma once
 #include <string>
-#include <memory.h>
+#include <cstring>  // Replaced memory.h with cstring
 #include "GitObjectStorage.hpp"
 #include "GitMerge.hpp"
+#include "GitConfig.hpp"
+#include "GitHead.hpp"
+#include "GitIndex.hpp"
 #include <vector>
 #include <unordered_set>
 #include <optional>
+#include <memory>  // For unique_ptr
+#include <stdexcept>  // For exceptions
+#include <mutex>  // For thread safety
 
-class GitRepository{
-  private :
-  std::string gitDir;
-  GitMerge merge;
+class GitRepository {
+private:
+    std::string gitDir;
+    std::unique_ptr<GitMerge> merge;  // Use smart pointer for better ownership
+    std::mutex mergeMutex;  // For thread safety
+    
+    // Helper methods
+    std::string createMergeCommit(const std::string& message, const std::string& author,
+                                const std::string& currentCommit, const std::string& targetCommit);
+    bool resolveConflicts(const std::string& targetBranch);
       // std::unique_ptr<GitObjectStore> objectStore;
 
   // Helper methods

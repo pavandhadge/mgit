@@ -19,9 +19,226 @@ std::ostream& operator<<(std::ostream& os, const ConflictStatus& status) {
     return os << "Unknown conflict";
 }
 
-GitMerge::GitMerge(const std::string& gitDir) : gitDir(gitDir) {}
+GitMerge::GitMerge(const std::string& gitDir) {
+    if (gitDir.empty()) {
+        throw MergeException("Git directory path cannot be empty");
+    }
+    
+    if (!std::filesystem::exists(gitDir)) {
+        throw MergeException("Git directory does not exist: " + gitDir);
+    }
+    
+    storage = std::make_unique<GitObjectStorage>(gitDir);
+    index = std::make_unique<GitIndex>(gitDir);
+}
+
+GitMerge::~GitMerge() {
+    // Ensure resources are properly cleaned up
+    storage.reset();
+    index.reset();
+}
+
+void GitMerge::validateCommit(const std::string& commitHash) {
+    if (commitHash.empty()) {
+        throw MergeException("Commit hash cannot be empty");
+    }
+    if (commitHash.size() != 40) {
+        throw MergeException("Invalid commit hash length: " + std::to_string(commitHash.size()));
+    }
+    if (!std::all_of(commitHash.begin(), commitHash.end(), ::isxdigit)) {
+        throw MergeException("Invalid commit hash format");
+    }
+}
+
+void GitMerge::validateBranch(const std::string& branchName) {
+    if (branchName.empty()) {
+        throw MergeException("Branch name cannot be empty");
+    }
+    if (branchName.find("/") != std::string::npos) {
+        throw MergeException("Branch name cannot contain slash characters");
+    }
+}
+
+void GitMerge::validatePath(const std::string& path) {
+    if (path.empty()) {
+        throw MergeException("Path cannot be empty");
+    }
+    if (path.find("../") != std::string::npos) {
+        throw MergeException("Path cannot contain parent directory references");
+    }
+}
+
+std::string GitMerge::findCommonAncestor(const std::string& currentCommit, const std::string& targetCommit) {
+    validateCommit(currentCommit);
+    validateCommit(targetCommit);
+    
+    std::lock_guard<std::mutex> lock(mergeMutex);
+    
+    GitRepository repo(gitDir);
+    std::unordered_set<std::string> currentBranchHistory = repo.logBranchCommitHistory(currentCommit);
+    std::unordered_set<std::string> targetBranchHistory = repo.logBranchCommitHistory(targetCommit);
+    
+    std::string commonAncestor = "";
+    for (const auto& commit : currentBranchHistory) {
+        if (targetBranchHistory.find(commit) != targetBranchHistory.end()) {
+            commonAncestor = commit;
+            break;
+        }
+    }
+    
+    if (commonAncestor.empty()) {
+        throw MergeException("No common ancestor found between commits");
+    }
+    return commonAncestor;
+}
+
+std::string GitMerge::findCommonAncestor(const std::string& currentCommit, const std::string& targetCommit) {
+    GitRepository repo(gitDir);
+    std::unordered_set<std::string> currentBranchHistory = repo.logBranchCommitHistory(currentCommit);
+    std::unordered_set<std::string> targetBranchHistory = repo.logBranchCommitHistory(targetCommit);
+    
+    std::string commonAncestor = "";
+    for (const auto& commit : currentBranchHistory) {
+        if (targetBranchHistory.find(commit) != targetBranchHistory.end()) {
+            commonAncestor = commit;
+            break;
+        }
+    }
+    
+    if (commonAncestor.empty()) {
+        throw std::runtime_error("No common ancestor found");
+    }
+    return commonAncestor;
+}
+
+std::string GitMerge::getBlobContent(const std::string& hash) {
+    if (hash.empty()) return "";
+    
+    std::string content = storage.readObject(GitObjectType::Blob, hash);
+    if (content.empty()) {
+        throw std::runtime_error("Failed to read blob content");
+    }
+    return content;
+}
+
+std::string GitMerge::mergeFileContents(const std::string& baseContent, 
+                                       const std::string& ourContent, 
+                                       const std::string& theirContent) {
+    std::stringstream result;
+    
+    if (baseContent == ourContent && ourContent == theirContent) {
+        return ourContent;  // No conflict
+    }
+    
+    if (baseContent == ourContent) {
+        return theirContent;  // Their change
+    }
+    
+    if (baseContent == theirContent) {
+        return ourContent;  // Our change
+    }
+    
+    // Conflict - create conflict markers
+    result << "<<<<<<< HEAD\n"
+            << ourContent << "\n=======\n"
+            << theirContent << "\n>>>>>>> " << theirContent << "\n";
+    
+    return result.str();
+}
+
+bool GitMerge::threeWayMerge(const std::string& currentCommit, 
+                            const std::string& targetCommit, 
+                            const std::string& commonAncestor) {
+    try {
+        // Get tree hashes
+        std::string currentTree = storage.readObject(GitObjectType::Commit, currentCommit).substr(5, 40);
+        std::string targetTree = storage.readObject(GitObjectType::Commit, targetCommit).substr(5, 40);
+        std::string ancestorTree = storage.readObject(GitObjectType::Commit, commonAncestor).substr(5, 40);
+        
+        // Merge trees
+        std::string mergedTree = mergeTrees(currentTree, targetTree, ancestorTree);
+        
+        // Update index with merged tree
+        GitIndex index(gitDir);
+        index.updateIndexFromTree(mergedTree);
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Three-way merge failed: " << e.what() << "\n";
+        return false;
+    }
+}
+
+std::string GitMerge::mergeTrees(const std::string& currentTree, 
+                                const std::string& targetTree, 
+                                const std::string& ancestorTree) {
+    try {
+        // Get tree objects
+        std::string currentContent = storage.readObject(GitObjectType::Tree, currentTree);
+        std::string targetContent = storage.readObject(GitObjectType::Tree, targetTree);
+        std::string ancestorContent = storage.readObject(GitObjectType::Tree, ancestorTree);
+        
+        // Parse tree entries
+        std::map<std::string, std::string> currentEntries, targetEntries, ancestorEntries;
+        parseTreeEntries(currentContent, currentEntries);
+        parseTreeEntries(targetContent, targetEntries);
+        parseTreeEntries(ancestorContent, ancestorEntries);
+        
+        // Create new tree
+        std::stringstream newTree;
+        
+        // Process each entry
+        for (const auto& [path, currentHash] : currentEntries) {
+            if (targetEntries.find(path) != targetEntries.end()) {
+                // Both branches modified
+                std::string baseHash = ancestorEntries[path];
+                std::string ourContent = getBlobContent(currentHash);
+                std::string theirContent = getBlobContent(targetEntries[path]);
+                std::string baseContent = getBlobContent(baseHash);
+                
+                std::string mergedContent = mergeFileContents(baseContent, ourContent, theirContent);
+                std::string mergedHash = storage.writeObject(GitObjectType::Blob, mergedContent);
+                newTree << "100644 " << mergedHash << "\0" << path;
+            } else if (ancestorEntries.find(path) == ancestorEntries.end()) {
+                // Only current branch modified
+                newTree << "100644 " << currentHash << "\0" << path;
+            }
+        }
+        
+        // Add new entries from target branch
+        for (const auto& [path, targetHash] : targetEntries) {
+            if (currentEntries.find(path) == currentEntries.end()) {
+                newTree << "100644 " << targetHash << "\0" << path;
+            }
+        }
+        
+        // Create new tree object
+        std::string treeHash = storage.writeObject(GitObjectType::Tree, newTree.str());
+        return treeHash;
+    } catch (const std::exception& e) {
+        std::cerr << "Tree merge failed: " << e.what() << "\n";
+        throw;
+    }
+}
+
+void GitMerge::parseTreeEntries(const std::string& content, std::map<std::string, std::string>& entries) {
+    std::stringstream ss(content);
+    std::string line;
+    while (std::getline(ss, line)) {
+        std::string mode, hash, path;
+        std::istringstream iss(line);
+        iss >> mode >> hash;
+        path = line.substr(mode.size() + hash.size() + 2); // Skip mode, hash, and spaces
+        entries[path] = hash;
+    }
+}
 
 bool GitMerge::checkForConflicts(const std::string& currentBranch, const std::string& targetBranch) {
+    validateBranch(currentBranch);
+    validateBranch(targetBranch);
+    
+    std::lock_guard<std::mutex> lock(mergeMutex);
+    
     GitRepository repo(gitDir);
     
     // Get tree hashes for both branches
@@ -29,27 +246,71 @@ bool GitMerge::checkForConflicts(const std::string& currentBranch, const std::st
     std::string targetHead = repo.getHashOfBranchHead(targetBranch);
     
     if (currentHead.empty() || targetHead.empty()) {
-        std::cerr << "Error: One or both branches have no commits\n";
-        return false;
+        throw MergeException("One or both branches have no commits");
     }
 
     // Get tree objects from commits
-    GitObjectStorage storage(gitDir);
-    std::string currentTreeHash = storage.readObject(GitObjectType::Commit, currentHead).substr(5, 40); // Skip "tree " prefix
-    std::string targetTreeHash = storage.readObject(GitObjectType::Commit, targetHead).substr(5, 40);
+    std::string currentTreeHash = storage->readObject(GitObjectType::Commit, currentHead).substr(5, 40);
+    validateTreeHash(currentTreeHash);
+    
+    std::string targetTreeHash = storage->readObject(GitObjectType::Commit, targetHead).substr(5, 40);
+    validateTreeHash(targetTreeHash);
 
     // Find common ancestor (for three-way merge)
     std::string commonAncestor = repo.findCommonAncestor(currentHead, targetHead);
-    std::string ancestorTreeHash = commonAncestor.empty() ? "" : storage.readObject(GitObjectType::Commit, commonAncestor).substr(5, 40);
+    std::string ancestorTreeHash = commonAncestor.empty() ? "" : storage->readObject(GitObjectType::Commit, commonAncestor).substr(5, 40);
+    
+    if (!ancestorTreeHash.empty()) {
+        validateTreeHash(ancestorTreeHash);
+    }
 
     // Find conflicts
     conflicts.clear();
     conflictDetails.clear();
-    findConflictsInTree(currentTreeHash, targetTreeHash);
-    detectFileRenames(currentTreeHash, targetTreeHash);
-    detectDirectoryConflicts(currentTreeHash, targetTreeHash);
+    
+    try {
+        compareTreeEntries(currentTreeHash, targetTreeHash);
+        detectFileRenames(currentTreeHash, targetTreeHash);
+        detectDirectoryConflicts(currentTreeHash, targetTreeHash);
+    } catch (const std::exception& e) {
+        throw MergeException("Failed to detect conflicts: " + std::string(e.what()));
+    }
 
     return !conflicts.empty();
+}
+
+void GitMerge::validateTreeHash(const std::string& treeHash) {
+    if (treeHash.empty()) {
+        throw MergeException("Tree hash cannot be empty");
+    }
+    if (treeHash.size() != 40) {
+        throw MergeException("Invalid tree hash length: " + std::to_string(treeHash.size()));
+    }
+    if (!std::all_of(treeHash.begin(), treeHash.end(), ::isxdigit)) {
+        throw MergeException("Invalid tree hash format");
+    }
+    
+    // Check if tree exists
+    if (storage->readObject(GitObjectType::Tree, treeHash).empty()) {
+        throw MergeException("Tree object not found: " + treeHash);
+    }
+}
+
+void GitMerge::validateBlobHash(const std::string& blobHash) {
+    if (blobHash.empty()) {
+        throw MergeException("Blob hash cannot be empty");
+    }
+    if (blobHash.size() != 40) {
+        throw MergeException("Invalid blob hash length: " + std::to_string(blobHash.size()));
+    }
+    if (!std::all_of(blobHash.begin(), blobHash.end(), ::isxdigit)) {
+        throw MergeException("Invalid blob hash format");
+    }
+    
+    // Check if blob exists
+    if (storage->readObject(GitObjectType::Blob, blobHash).empty()) {
+        throw MergeException("Blob object not found: " + blobHash);
+    }
 }
 
 std::vector<std::string> GitMerge::getConflictingFiles() {
