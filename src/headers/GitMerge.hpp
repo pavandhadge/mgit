@@ -38,8 +38,11 @@ public:
 
 private:
     std::string gitDir;
-    std::unordered_map<std::string, ConflictStatus> conflicts;
-    std::unordered_map<std::string, std::string> conflictDetails;
+    GitObjectStorage storage;
+    GitIndex index;
+    std::vector<std::string> conflicts;
+    std::map<std::string, std::string> conflictDetails;
+    std::mutex mergeMutex;
 
     // Helper functions
     bool compareTrees(const std::string& tree1, const std::string& tree2);
@@ -48,4 +51,48 @@ private:
     void findConflictsInBlob(const std::string& blob1, const std::string& blob2, const std::string& filename);
     void detectFileRenames(const std::string& tree1, const std::string& tree2);
     void detectDirectoryConflicts(const std::string& tree1, const std::string& tree2);
+
+    // Three-way merge helpers
+    std::string findCommonAncestor(const std::string& currentCommit, const std::string& targetCommit);
+    std::string getBlobContent(const std::string& hash);
+    std::string mergeFileContents(const std::string& baseContent, 
+                                 const std::string& ourContent, 
+                                 const std::string& theirContent);
+
+    // Tree comparison helpers
+    void compareTreeEntries(const std::string& tree1, const std::string& tree2,
+                          bool recursive = true);
+    void detectFileRenames(const std::string& tree1, const std::string& tree2);
+    void detectDirectoryConflicts(const std::string& tree1, const std::string& tree2);
+
+    // Error handling
+    void validateCommit(const std::string& commitHash);
+    void validateBranch(const std::string& branchName);
+    void validatePath(const std::string& path);
+    void validateTreeHash(const std::string& treeHash);
+    void validateBlobHash(const std::string& blobHash);
+
+public:
+    GitMerge(const std::string& gitDir);
+    ~GitMerge();
+
+    // Merge operations
+    bool checkForConflicts(const std::string& currentBranch, const std::string& targetBranch);
+    std::vector<std::string> getConflictingFiles();
+    ConflictStatus getFileConflictStatus(const std::string& filename);
+    std::string getConflictDetails(const std::string& filename);
+
+    // Three-way merge methods
+    bool threeWayMerge(const std::string& currentCommit, 
+                      const std::string& targetCommit, 
+                      const std::string& commonAncestor);
+    std::string mergeTrees(const std::string& currentTree, 
+                         const std::string& targetTree, 
+                         const std::string& ancestorTree);
+
+    // Error handling
+    class MergeException : public std::runtime_error {
+        public:
+            using std::runtime_error::runtime_error;
+    };
 };
