@@ -130,7 +130,7 @@ void IndexManager::recordConflict(const std::string& path, const IndexEntry& bas
     conflictEntry.base_hash = base.hash;
     conflictEntry.their_hash = theirs.hash;
     conflictEntry.conflict_state = ConflictState::UNRESOLVED;
-    
+    //
     addOrUpdateEntry(conflictEntry);
     
     // Create conflict marker
@@ -270,10 +270,13 @@ void IndexManager::writeIndex() {
     }
 }
 
+// DUPLICATE: The following non-const getEntries is a duplicate and should be removed after confirmation.
+/*
 const std::vector<IndexEntry>& IndexManager::getEntries() {
     readIndex();
     return entries;
 }
+*/
 
 void IndexManager::addOrUpdateEntry(const IndexEntry& entry) {
     auto it = pathToIndex.find(entry.path);
@@ -285,6 +288,8 @@ void IndexManager::addOrUpdateEntry(const IndexEntry& entry) {
     }
 }
 
+// DUPLICATE: The following printEntries is a duplicate and should be removed after confirmation.
+/*
 void IndexManager::printEntries() const {
     std::cout << "Index entries:\n";
     for (const auto& entry : entries) {
@@ -293,6 +298,7 @@ void IndexManager::printEntries() const {
                   << ", Hash (hex): " << binaryToHex(entry.hash) << "\n";
     }
 }
+*/
 
 std::vector<std::pair<std::string, std::string>> IndexManager::computeStatus() {
     std::vector<std::pair<std::string, std::string>> changeRecords;
