@@ -1,4 +1,3 @@
-
 # 🧠 `mgit` — A Minimal Git Clone with Better Readability
 
 **`mgit`** is a personal Git clone written in **C++**, built to demystify how Git works internally and to explore new ways of improving its usability and readability for users.
@@ -18,6 +17,7 @@ It's built as a learning tool **and** as a possible base for more human-readable
 * ✅ Raw and pretty object reading (`mgit cat-file`, `mgit ls-tree`)
 * ✅ CLI11-based CLI for clear UX
 * 🧪 Educational source code ideal for learning Git internals
+* 📝 **Comprehensive activity logging and AI-ready analysis**
 
 ---
 
@@ -116,6 +116,47 @@ Auto-detects the type and displays content in human-readable format.
 
 ---
 
+## 📊 Activity Logging & AI Analysis
+
+`mgit` automatically logs all command activity, performance, and errors to `.mgit/activity.log` and related files. You can analyze your usage, performance, and errors with:
+
+```bash
+mgit activity <subcommand> [options]
+```
+
+**Available subcommands:**
+
+- `summary` — Full log summary (success/failure, top commands, errors, etc.)
+- `performance` — Per-command timing and performance stats
+- `errors` — Error report (recent errors, error types, etc.)
+- `analysis` — Usage patterns and common command sequences
+- `timeline` — Activity timeline by day
+- `health` — Repository health and recent error/response rates
+- `workflow` — Common workflow patterns (command triplets)
+- `slow` — List of slowest commands
+- `usage` — Command usage statistics
+- `stats` — Log file sizes and stats
+- `recent -l N` — Show last N commands
+- `export` — Export activity log to CSV
+- `raw` — Show raw activity log
+- `errors-raw` — Show raw error log
+- `performance-raw` — Show raw performance log
+
+**Example:**
+
+```bash
+mgit activity summary
+mgit activity performance
+mgit activity errors
+mgit activity timeline
+mgit activity usage
+mgit activity export
+```
+
+All logs are stored in `.mgit/` and are AI-ready for further analysis or integration.
+
+---
+
 ## 📚 Why I Built This
 
 I made `mgit` to:
@@ -123,8 +164,9 @@ I made `mgit` to:
 * Learn Git internals by re-implementing them
 * Understand Git objects, trees, commits, and tags deeply
 * Build a version control interface that's easier for humans to reason about
+* **Explore AI-driven developer tooling and analytics**
 
-It’s a personal project, educational journey, and exploration of simplicity in tooling.
+It's a personal project, educational journey, and exploration of simplicity in tooling.
 
 ---
 
@@ -151,22 +193,25 @@ mgit/
 ├── src/
 │   ├── main.cpp
 │   ├── GitRepository.cpp
-│   ├── BlobObject.cpp
+│   ├── GitActivityLogger.cpp
 │   └── ...
 ├── headers/
 │   └── *.hpp
-└── .git/objects/  ← Created at runtime
+├── .git/objects/  ← Created at runtime
+└── .mgit/         ← Activity logs and analytics
 ```
 
 ---
 
 ## 📈 Roadmap
 
-* [ ] Add staging/index support (`mgit add`)
-* [ ] Implement basic branches
-* [ ] `mgit log` with pretty output
+* [x] Add staging/index support (`mgit add`)
+* [x] Implement basic branches
+* [x] `mgit log` with pretty output
+* [x] **Comprehensive activity logging and AI-ready analytics**
 * [ ] Remote pushing/pulling for learning
 * [ ] Explore more user-friendly logs/commits
+* [ ] More advanced AI-driven suggestions and summaries
 
 ---
 

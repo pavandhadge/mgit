@@ -47,9 +47,10 @@ public:
   bool threeWayMerge(const std::string &currentCommit,
                      const std::string &targetCommit,
                      const std::string &commonAncestor);
-  std::string mergeTrees(const std::string &currentTree,
-                         const std::string &targetTree,
-                         const std::string &ancestorTree);
+  bool mergeTrees(const std::string &currentTree,
+                 const std::string &targetTree,
+                 const std::string &ancestorTree,
+                 std::string &mergedTreeHash);
 
   // Error handling
   class MergeException : public std::runtime_error {
@@ -59,20 +60,20 @@ public:
 
 private:
   std::string gitDir;
-  GitObjectStorage storage;
-  IndexManager index;
-  std::vector<std::string> conflicts;
+  std::unique_ptr<GitObjectStorage> storage;
+  std::unique_ptr<IndexManager> index;
+  std::map<std::string, ConflictStatus> conflicts;
   std::map<std::string, std::string> conflictDetails;
   std::mutex mergeMutex;
 
   // Helper functions
   bool compareTrees(const std::string &tree1, const std::string &tree2);
   bool compareBlobs(const std::string &blob1, const std::string &blob2);
-  void findConflictsInTree(const std::string &tree1, const std::string &tree2);
-  void findConflictsInBlob(const std::string &blob1, const std::string &blob2,
+  bool findConflictsInTree(const std::string &tree1, const std::string &tree2);
+  bool findConflictsInBlob(const std::string &blob1, const std::string &blob2,
                            const std::string &filename);
-  void detectFileRenames(const std::string &tree1, const std::string &tree2);
-  void detectDirectoryConflicts(const std::string &tree1,
+  bool detectFileRenames(const std::string &tree1, const std::string &tree2);
+  bool detectDirectoryConflicts(const std::string &tree1,
                                 const std::string &tree2);
 
   // Three-way merge helpers
@@ -84,13 +85,13 @@ private:
                                 const std::string &theirContent);
 
   // Tree comparison helpers
-  void compareTreeEntries(const std::string &tree1, const std::string &tree2,
+  bool compareTreeEntries(const std::string &tree1, const std::string &tree2,
                           bool recursive = true);
 
   // Error handling
-  void validateCommit(const std::string &commitHash);
-  void validateBranch(const std::string &branchName);
-  void validatePath(const std::string &path);
-  void validateTreeHash(const std::string &treeHash);
-  void validateBlobHash(const std::string &blobHash);
+  bool validateCommit(const std::string &commitHash);
+  bool validateBranch(const std::string &branchName);
+  bool validatePath(const std::string &path);
+  bool validateTreeHash(const std::string &treeHash);
+  bool validateBlobHash(const std::string &blobHash);
 };

@@ -9,9 +9,11 @@
 #include <vector>
 #include <sstream>
 #include <filesystem>
+#include <algorithm>
 #include "headers/GitIndex.hpp"
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitMerge.hpp"
+#include "headers/GitObjectTypesClasses.hpp"
 
 IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
     IndexEntry newEntry;
@@ -23,6 +25,12 @@ IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
 
     newEntry.path = path;
     newEntry.mode = std::filesystem::is_directory(path) ? "040000" : "100644";
+    
+    // Set default values for merge-related fields
+    newEntry.base_hash = "0000000000000000000000000000000000000000";
+    newEntry.their_hash = "0000000000000000000000000000000000000000";
+    newEntry.conflict_state = ConflictState::NONE;
+    newEntry.conflict_marker = "";
 
     // Read content for files
     if (std::filesystem::is_regular_file(path)) {
@@ -37,13 +45,13 @@ IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
         std::string content = data.str();
 
         // Create blob object
-        BlobObject blob;
-        newEntry.hash = blob.writeObject(content);
+        BlobObject blob(".git");
+        newEntry.hash = blob.writeObject(path, true);
 
         curr_file.close();
     } else if (std::filesystem::is_directory(path)) {
         // Create tree object
-        TreeObject subTree;
+        TreeObject subTree(".git");
         newEntry.hash = subTree.writeObject(path);
     } else {
         std::cerr << "Unsupported file type at path: " << path << "\n";
@@ -53,12 +61,25 @@ IndexEntry IndexManager::gitIndexEntryFromPath(const std::string &path) {
     return newEntry;
 }
 
-void IndexManager::readIndex() {
-    std::string path = ".git/INDEX";
+bool IndexManager::readIndex() {
+    std::string path = ".git/index";
     if (!std::filesystem::exists(path)) {
         std::cerr << "Error: INDEX file does not exist at path: " << path << "\n";
-        return;
+        return false;
     }
+
+    // Check if file is empty
+    std::ifstream checkFile(path);
+    checkFile.seekg(0, std::ios::end);
+    if (checkFile.tellg() == 0) {
+        // Empty index file is valid
+        entries.clear();
+        pathToIndex.clear();
+        conflictMarkers.clear();
+        checkFile.close();
+        return true;
+    }
+    checkFile.close();
 
     std::ifstream index;
     try {
@@ -71,35 +92,49 @@ void IndexManager::readIndex() {
 
         std::string line;
         size_t i = 0;
+        bool anyValid = false;
         while (std::getline(index, line)) {
+            int conflict_state_int;
             std::istringstream iss(line);
             IndexEntry entry;
-
-            // Format: mode path hash base_hash their_hash conflict_state conflict_marker
             if (!(iss >> entry.mode >> entry.path >> entry.hash >> entry.base_hash >> 
-                  entry.their_hash >> entry.conflict_state >> entry.conflict_marker)) {
+                  entry.their_hash >> conflict_state_int >> entry.conflict_marker)) {
                 std::cerr << "Warning: Malformed index line skipped: " << line << "\n";
                 continue;
             }
-
+            entry.conflict_state = static_cast<ConflictState>(conflict_state_int);
             if (entry.hash.length() != 40 || entry.base_hash.length() != 40 || 
                 entry.their_hash.length() != 40) {
                 std::cerr << "Warning: Invalid hash length for path '" << entry.path << "'. Skipping entry.\n";
                 continue;
             }
-
             entries.push_back(entry);
             pathToIndex[entry.path] = i++;
+            anyValid = true;
         }
-
         index.close();
+        if (!anyValid) {
+            std::cerr << "Warning: Index file not in mgit format. Reinitializing as empty index.\n";
+            std::ofstream clearIndex(path, std::ios::trunc);
+            clearIndex.close();
+            entries.clear();
+            pathToIndex.clear();
+            conflictMarkers.clear();
+        }
+        return true;
     } catch (const std::ios_base::failure& e) {
         std::cerr << "I/O error while reading INDEX file: " << e.what() << "\n";
         if (index.is_open()) index.close();
+        // Reinitialize as empty index
+        std::cerr << "Warning: Index file not in mgit format. Reinitializing as empty index.\n";
+        std::ofstream clearIndex(path, std::ios::trunc);
+        clearIndex.close();
+        entries.clear();
+        pathToIndex.clear();
+        conflictMarkers.clear();
+        return true;
     }
 }
-
-
 
 void IndexManager::addOrUpdateEntry(const IndexEntry& entry) {
     auto it = pathToIndex.find(entry.path);
@@ -134,10 +169,10 @@ void IndexManager::recordConflict(const std::string& path, const IndexEntry& bas
     addOrUpdateEntry(conflictEntry);
     
     // Create conflict marker
-    GitObjectStorage storage;
-    std::string baseContent = base.hash.empty() ? "" : storage.readObject(GitObjectType::Blob, base.hash);
-    std::string ourContent = ours.hash.empty() ? "" : storage.readObject(GitObjectType::Blob, ours.hash);
-    std::string theirContent = theirs.hash.empty() ? "" : storage.readObject(GitObjectType::Blob, theirs.hash);
+    BlobObject blobObj(".git");
+    std::string baseContent = base.hash.empty() ? "" : blobObj.readObject(base.hash).content;
+    std::string ourContent = ours.hash.empty() ? "" : blobObj.readObject(ours.hash).content;
+    std::string theirContent = theirs.hash.empty() ? "" : blobObj.readObject(theirs.hash).content;
     
     ConflictMarker marker = {
         baseContent,
@@ -181,30 +216,31 @@ bool IndexManager::isConflicted(const std::string& path) const {
     return false;
 }
 
-void IndexManager::resolveConflict(const std::string& path, const std::string& hash) {
-    auto it = pathToIndex.find(path);
-    if (it == pathToIndex.end()) {
-        std::cerr << "Error: Path not found in index: " << path << "\n";
-        return;
+bool IndexManager::resolveConflict(const std::string& path, const std::string& hash) {
+    try {
+        auto it = pathToIndex.find(path);
+        if (it == pathToIndex.end()) {
+            std::cerr << "Error: Path not found in index: " << path << "\n";
+            return false;
+        }
+        IndexEntry& entry = entries[it->second];
+        entry.hash = hash;
+        entry.conflict_state = ConflictState::RESOLVED;
+        entry.conflict_marker.clear();
+        std::string markerPath = path + ".mgit-conflict";
+        if (std::filesystem::exists(markerPath)) {
+            std::filesystem::remove(markerPath);
+        }
+        BlobObject blobObj(".git");
+        std::string content = blobObj.readObject(hash).content;
+        std::ofstream file(path);
+        file << content;
+        file.close();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "resolveConflict failed: " << e.what() << std::endl;
+        return false;
     }
-
-    IndexEntry& entry = entries[it->second];
-    entry.hash = hash;
-    entry.conflict_state = ConflictState::RESOLVED;
-    entry.conflict_marker.clear();
-    
-    // Remove conflict marker file
-    std::string markerPath = path + ".mgit-conflict";
-    if (std::filesystem::exists(markerPath)) {
-        std::filesystem::remove(markerPath);
-    }
-    
-    // Update working directory file
-    GitObjectStorage storage;
-    std::string content = storage.readObject(GitObjectType::Blob, hash);
-    std::ofstream file(path);
-    file << content;
-    file.close();
 }
 
 void IndexManager::abortMerge() {
@@ -248,9 +284,8 @@ std::optional<ConflictMarker> IndexManager::getConflictMarker(const std::string&
     return std::nullopt;
 }
 
-
 void IndexManager::writeIndex() {
-    std::string path = ".git/INDEX";
+    std::string path = ".git/index";
     std::ofstream index;
     try {
         index.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -269,36 +304,6 @@ void IndexManager::writeIndex() {
         if (index.is_open()) index.close();
     }
 }
-
-// DUPLICATE: The following non-const getEntries is a duplicate and should be removed after confirmation.
-/*
-const std::vector<IndexEntry>& IndexManager::getEntries() {
-    readIndex();
-    return entries;
-}
-*/
-
-void IndexManager::addOrUpdateEntry(const IndexEntry& entry) {
-    auto it = pathToIndex.find(entry.path);
-    if (it != pathToIndex.end()) {
-        entries[it->second] = entry;
-    } else {
-        entries.push_back(entry);
-        pathToIndex[entry.path] = entries.size() - 1;
-    }
-}
-
-// DUPLICATE: The following printEntries is a duplicate and should be removed after confirmation.
-/*
-void IndexManager::printEntries() const {
-    std::cout << "Index entries:\n";
-    for (const auto& entry : entries) {
-        std::cout << "Mode: " << entry.mode
-                  << ", Path: " << entry.path
-                  << ", Hash (hex): " << binaryToHex(entry.hash) << "\n";
-    }
-}
-*/
 
 std::vector<std::pair<std::string, std::string>> IndexManager::computeStatus() {
     std::vector<std::pair<std::string, std::string>> changeRecords;
@@ -334,7 +339,7 @@ std::vector<std::pair<std::string, std::string>> IndexManager::computeStatus() {
             continue;
         }
 
-        BlobObject obj;
+        BlobObject obj(".git");
         std::string currHash =obj.writeObject(pathStr, false);
 
         if (currHash != it->second) {

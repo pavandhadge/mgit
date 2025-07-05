@@ -3,14 +3,26 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <memory>
+#include <optional>
+#include <filesystem>
+
+class ObjectException : public std::exception {
+public:
+    explicit ObjectException(const std::string& message) : message_(message) {}
+    const char* what() const noexcept override { return message_.c_str(); }
+private:
+    std::string message_;
+};
 
 enum class GitObjectType {
     Blob,
-        Tree,
-        Commit,
-        Tag,
-        Unknown
+    Tree,
+    Commit,
+    Tag,
+    Unknown
 };
+
 struct CommitData {
     std::string tree;
     std::vector<std::string> parents;
@@ -18,6 +30,7 @@ struct CommitData {
     std::string committer;
     std::string message;
 };
+
 struct TagData {
     std::string objectHash;   // SHA of the object being tagged
     std::string objectType;   // "commit", "tree", "blob"
@@ -38,71 +51,42 @@ struct TreeEntry {
     std::string hash;
 };
 
-class GitObjectStorage{
-  public :
-  std::string writeObject( const std::string& content );
-
-  std::string readObject(const std::string& hash);
-  GitObjectType identifyType(const std::string &hash);
-  GitObjectStorage(const std::string &gitDir = ".git");
-  private :
-  std::string gitDir;
-
-      std::string objectTypeToString(GitObjectType type);
-      GitObjectType parseGitObjectTypeFromString(const std::string& header);
-
-};
-
-class BlobObject : public GitObjectStorage {
-private:
-    GitObjectType type;
-    BlobData content;
+class StorageException : public std::exception {
 public:
-    BlobObject();
-
-    std::string writeObject(const std::string& path, const bool& write); // Reads file and stores blob
-    BlobData readObject(const std::string& hash);                        // Reads blob from disk
-    const BlobData& getContent() const;
-    GitObjectType getType() const;
-};
-
-class TreeObject : public GitObjectStorage {
+    explicit StorageException(const std::string& message) : message_(message) {}
+    const char* what() const noexcept override { return message_.c_str(); }
 private:
-    GitObjectType type;
-    std::vector<TreeEntry> content;
+    std::string message_;
+};
+
+class GitObjectStorage {
 public:
-    TreeObject();
-    bool restoreWorkingDirectoryFromTreeHash(const std::string &hash,const  std::string &path);
-    std::string writeObject(const std::string& path);
-    std::vector<TreeEntry> readObject(const std::string& hash);
-    const std::vector<TreeEntry>& getContent() const;
-    void restoreTreeContents(const std::string &hash, const std::string &path, std::unordered_set<std::string>& treePaths);
-    GitObjectType getType() const;
-};
+    explicit GitObjectStorage(const std::string& gitDir = ".git");
+    
+    // Core storage operations
+    std::string readObject(const std::string& hash);
+    bool writeObject(const std::string& hash, const std::string& content);
+    std::string writeObject(const std::string& content);
+    bool deleteObject(const std::string& hash);
+    bool objectExists(const std::string& hash);
+    
+    // Validation and maintenance
+    bool validateHash(const std::string& hash);
+    bool validateObjectIntegrity(const std::string& hash);
+    bool cleanupOrphanedObjects();
+    bool compressObjects();
+    
+    // Utility methods
+    std::string getObjectPath(const std::string& hash) const;
+    std::vector<std::string> listAllObjects() const;
+    size_t getObjectCount() const;
 
+protected:
+    const std::string& getGitDir() const { return gitDir; }
 
-
-class CommitObject:public GitObjectStorage{
-    private :
-    GitObjectType type ;
-    CommitData content;
-    public :
-    std::string writeObject(const CommitData& data) ;
-    CommitData readObject(const std::string& hash);
-  const CommitData& getContent() const;
-     GitObjectType getType() const;
-  CommitObject();
-};
-
-class TagObject:public GitObjectStorage{
-    private :
-    GitObjectType type ;
-    TagData content;
-    public :
-    std::string writeObject(const TagData& data);
-    const TagData getContent() const ;
-       GitObjectType getType() const;
-
-       TagData readObject(const std::string& hash);
-  TagObject();
+private:
+    std::string gitDir;
+    std::string objectsDir;
+    std::string objectTypeToString(GitObjectType type);
+    GitObjectType parseGitObjectTypeFromString(const std::string& header);
 };

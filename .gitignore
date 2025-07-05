@@ -54,3 +54,6 @@ dkms.conf
 build
 vcpkg
 vcpkg_installed
+
+
+test_evaluation/*

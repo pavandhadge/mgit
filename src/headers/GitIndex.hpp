@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,7 +35,7 @@ private:
 
 public:
     // Core index methods
-    void readIndex();             // Populates entries and map
+    bool readIndex();             // Populates entries and map
     void writeIndex();            // Writes vector entries to disk
     void addOrUpdateEntry(const IndexEntry& entry);
     const std::vector<IndexEntry>& getEntries() const;
@@ -48,7 +49,7 @@ public:
     bool hasConflicts() const;
     std::vector<std::string> getConflictingFiles() const;
     bool isConflicted(const std::string& path) const;
-    void resolveConflict(const std::string& path, const std::string& hash);
+    bool resolveConflict(const std::string& path, const std::string& hash);
     void abortMerge();
     void addConflictMarker(const std::string& path, const ConflictMarker& marker);
     std::optional<ConflictMarker> getConflictMarker(const std::string& path) const;
