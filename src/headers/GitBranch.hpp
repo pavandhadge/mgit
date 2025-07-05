@@ -1,6 +1,15 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <filesystem>
+
+class BranchException : public std::exception {
+public:
+    explicit BranchException(const std::string& message) : message_(message) {}
+    const char* what() const noexcept override { return message_.c_str(); }
+private:
+    std::string message_;
+};
 
 class Branch {
 public:
@@ -17,20 +26,20 @@ public:
     std::string getCurrentBranch() const;
 
     // Get list of all local branches (i.e., files in .git/refs/heads/)
-    std::vector<std::string> listBranches() const;
+    bool listBranches() const;
 
     // Get the commit hash where a branch currently points
     std::string getCurrentBranchHash() const;
 
     // Update the commit hash a branch points to
     bool updateBranchHead(const std::string& branchName, const std::string& newHash);
-    bool deleteBranch(const std::string &branchName);
+    bool deleteBranch(const std::string& branchName);
     bool renameBranch(const std::string& oldName, const std::string& newName);
-    std::string getBranchHash(const std::string& branchName) const ;
+    std::string getBranchHash(const std::string& branchName) const;
+    std::vector<std::string> getAllBranches() const;
+
 private:
     std::string gitDir = ".git/";
     std::string headsDir = ".git/refs/heads/";
     std::string headFile = ".git/HEAD";
-
-
 };

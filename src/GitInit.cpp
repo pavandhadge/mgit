@@ -7,28 +7,32 @@
 
 GitInit::GitInit(const std::string& gitDir) : gitDir(gitDir) {}
 
-void GitInit::run() {
+bool GitInit::run() {
     try {
-        if (std::filesystem::exists(gitDir)) {
-            if (!std::filesystem::is_directory(gitDir)) {
-                throw std::runtime_error(gitDir + " exists but is not a directory.");
+        std::string dotGit = gitDir + "/.git";
+        if (std::filesystem::exists(dotGit)) {
+            if (!std::filesystem::is_directory(dotGit)) {
+                throw std::runtime_error(dotGit + " exists but is not a directory.");
             }
-            std::cout << "Reinitialized existing Git repository in " << gitDir << "/\n";
+            std::cout << "Reinitialized existing Git repository in " << dotGit << "/\n";
         } else {
-            createDirectory(gitDir);
-            std::cout << "Initialized empty Git repository in " << gitDir << "/\n";
+            createDirectory(dotGit);
+            std::cout << "Initialized empty Git repository in " << dotGit << "/\n";
         }
 
-        createDirectory(gitDir + "/objects");
-        createDirectory(gitDir + "/refs/heads");
-        createFile(gitDir + "/HEAD", "ref: refs/heads/main\n");
+        createDirectory(dotGit + "/objects");
+        createDirectory(dotGit + "/refs/heads");
+        createFile(dotGit + "/HEAD", "ref: refs/heads/main\n");
+        // Create empty index file
+        createFile(dotGit + "/index", "");
 
         gitHead head;
         head.writeHeadToHeadOfNewBranch("main");
 
+        return true;
     } catch (const std::exception& e) {
-        std::cerr << "Init error: " << e.what() << "\n";
-        throw; // allow caller to catch if needed
+        std::cerr << "GitInit::run failed: " << e.what() << std::endl;
+        return false;
     }
 }
 
@@ -40,19 +44,30 @@ bool GitInit::isDirectory(const std::string& path) {
     return std::filesystem::is_directory(path);
 }
 
-void GitInit::createDirectory(const std::string& path) {
-    if (!std::filesystem::exists(path)) {
-        if (!std::filesystem::create_directories(path)) {
-            throw std::runtime_error("Failed to create directory: " + path);
+bool GitInit::createDirectory(const std::string& path) {
+    try {
+        if (!std::filesystem::exists(path)) {
+            std::filesystem::create_directories(path);
         }
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "createDirectory failed: " << e.what() << std::endl;
+        return false;
     }
 }
 
-void GitInit::createFile(const std::string& path, const std::string& content) {
-    std::ofstream file(path);
-    if (!file) {
-        throw std::runtime_error("Failed to create file: " + path);
+bool GitInit::createFile(const std::string& path, const std::string& content) {
+    try {
+        std::ofstream file(path);
+        if (!file.is_open()) {
+            std::cerr << "Failed to create file: " << path << std::endl;
+            return false;
+        }
+        file << content;
+        file.close();
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "createFile failed: " << e.what() << std::endl;
+        return false;
     }
-    file << content;
-    file.close();
 }

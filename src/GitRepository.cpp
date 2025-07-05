@@ -7,19 +7,27 @@
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/ZlibUtils.hpp"
+#include "headers/GitObjectTypesClasses.hpp"
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
-GitRepository::GitRepository(const std::string &root) : gitDir(root) {}
+GitRepository::GitRepository(const std::string &root) : gitDir(root), merge(std::make_unique<GitMerge>(gitDir)) {}
 
-void GitRepository::init(const std::string &path) {
-  gitDir = path; // set gitDir first
-  GitInit objInit(gitDir);
-  objInit.run();
+bool GitRepository::init(const std::string &path) {
+  try {
+    gitDir = path;
+    GitInit objInit(gitDir);
+    objInit.run();
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "Init failed: " << e.what() << std::endl;
+    return false;
+  }
 }
 
 // ---------- Blob / Tree ----------
@@ -27,10 +35,10 @@ std::string GitRepository::writeObject(const GitObjectType type,
                                        const std::string &path,
                                        const bool &write) {
   if (type == GitObjectType::Blob) {
-    BlobObject blob;
+    BlobObject blob(gitDir);
     return blob.writeObject(path, write);
   } else if (type == GitObjectType::Tree) {
-    TreeObject tree;
+    TreeObject tree(gitDir);
     return tree.writeObject(path);
   } else {
     std::cerr << "Invalid object type for path-based creation\n";
@@ -45,7 +53,7 @@ std::string GitRepository::writeObject(GitObjectType type,
     std::cerr << "Invalid object type used for commit\n";
     return "";
   }
-  CommitObject commit;
+  CommitObject commit(gitDir);
   return commit.writeObject(data);
 }
 
@@ -56,23 +64,23 @@ std::string GitRepository::writeObject(GitObjectType type,
     std::cerr << "Invalid object type used for tag\n";
     return "";
   }
-  TagObject tag;
+  TagObject tag(gitDir);
   return tag.writeObject(data);
 }
 
 std::string GitRepository::readObjectRaw(const std::string &path) {
-  GitObjectStorage obj;
+  GitObjectStorage obj(gitDir);
   return obj.readObject(path);
 }
 
 std::string GitRepository::readObject(const GitObjectType type,
                                       const std::string &hash) {
   if (type == GitObjectType::Blob) {
-    BlobObject blob;
+    BlobObject blob(gitDir);
     BlobData data = blob.readObject(hash);
     return data.content;
   } else if (type == GitObjectType::Tree) {
-    TreeObject tree;
+    TreeObject tree(gitDir);
     std::vector<TreeEntry> entries = tree.readObject(hash);
     std::ostringstream out;
     for (const auto &entry : entries) {
@@ -80,7 +88,7 @@ std::string GitRepository::readObject(const GitObjectType type,
     }
     return out.str();
   } else if (type == GitObjectType::Tag) {
-    TagObject tag;
+    TagObject tag(gitDir);
     TagData data = tag.readObject(hash);
     std::ostringstream out;
     out << "Object: " << data.objectHash << "\n"
@@ -90,7 +98,7 @@ std::string GitRepository::readObject(const GitObjectType type,
         << "Message: " << data.message << "\n";
     return out.str();
   } else if (type == GitObjectType::Commit) {
-    CommitObject commit;
+    CommitObject commit(gitDir);
     CommitData data = commit.readObject(hash);
     std::ostringstream out;
     out << "Tree: " << data.tree << "\n";
@@ -109,7 +117,10 @@ std::string GitRepository::readObject(const GitObjectType type,
 
 void GitRepository::indexHandler(const std::vector<std::string> &paths) {
   IndexManager idx;
-  idx.readIndex();
+  if (!idx.readIndex()) {
+    std::cerr << "Failed to read index." << std::endl;
+    return;
+  }
 
   if (paths.size() == 1 && paths[0] == ".") {
     for (const auto &entry :
@@ -138,67 +149,78 @@ void GitRepository::indexHandler(const std::vector<std::string> &paths) {
   idx.writeIndex();
 }
 
-void GitRepository::reportStatus(bool shortFormat, bool showUntracked) {
-  IndexManager idx;
-  auto changes = idx.computeStatus(); // your function returning
-                                      // vector<pair<string, string>>
-
-  std::ostringstream out;
-
-  for (const auto &[status, path] : changes) {
-    if (!showUntracked && status == "untracked:") {
-      continue; // skip untracked files if flag is off
+bool GitRepository::reportStatus(bool shortFormat, bool showUntracked) {
+  try {
+    IndexManager idx;
+    std::vector<std::pair<std::string, std::string>> changes = idx.computeStatus();
+    std::ostringstream out;
+    for (const auto &[status, path] : changes) {
+      if (!showUntracked && status == "untracked:") {
+        continue;
+      }
+      if (shortFormat) {
+        if (status == "modified:")
+          out << "M ";
+        else if (status == "untracked:")
+          out << "?? ";
+        else if (status == "deleted:")
+          out << "D ";
+        else
+          out << "  ";
+        out << path << "\n";
+      } else {
+        out << status << " " << path << "\n";
+      }
     }
-    if (shortFormat) {
-      // Print short status codes, like 'M ', '?? '
-      if (status == "modified:")
-        out << "M ";
-      else if (status == "untracked:")
-        out << "?? ";
-      else if (status == "deleted:")
-        out << "D ";
-      else
-        out << "  "; // unknown, print blank
-      out << path << "\n";
-    } else {
-      // Long format: full words
-      out << status << " " << path << "\n";
-    }
-  }
-
-  std::cout << out.str() << std::endl;
-}
-
-void GitRepository::CreateBranch(const std::string &branchName) {
-  Branch branchObj;
-  branchObj.createBranch(branchName);
-}
-void GitRepository::listbranches(const std::string &branchName) {
-  Branch branchObj;
-  std::vector<std::string> branchList = branchObj.listBranches();
-  std::string currBranch = branchObj.getCurrentBranch();
-
-  for (const std::string branch : branchList) {
-    if (branch == currBranch) {
-      std::cout << "*";
-    }
-    std::cout << branch << std::endl;
+    std::cout << out.str() << std::endl;
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "Status failed: " << e.what() << std::endl;
+    return false;
   }
 }
+
+bool GitRepository::CreateBranch(const std::string &branchName) {
+  try {
+    Branch branchObj;
+    return branchObj.createBranch(branchName);
+  } catch (const std::exception &e) {
+    std::cerr << "CreateBranch failed: " << e.what() << std::endl;
+    return false;
+  }
+}
+
+bool GitRepository::listbranches(const std::string& branchName) {
+    try {
+        Branch branchObj;
+        if (!branchObj.listBranches()) {
+            throw std::runtime_error("Failed to list branches");
+        }
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "listbranches failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
 std::string GitRepository::getCurrentBranch() const {
   Branch branchObj;
   return branchObj.getCurrentBranch();
 }
 
-void GitRepository::changeCurrentBranch(const std::string &targetBranch,
-                                        bool createflag) {
-  if (createflag) {
-    CreateBranch(targetBranch);
+bool GitRepository::changeCurrentBranch(const std::string &targetBranch, bool createflag) {
+  try {
+    if (createflag) {
+      if (!CreateBranch(targetBranch)) return false;
+    }
+    Branch branchObj;
+    gitHead head;
+    head.writeHeadToHeadOfNewBranch(targetBranch);
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "changeCurrentBranch failed: " << e.what() << std::endl;
+    return false;
   }
-  // alot to do here but currently we wait
-  Branch branchObj;
-  gitHead head;
-  head.writeHeadToHeadOfNewBranch(targetBranch);
 }
 
 std::string GitRepository::getHashOfBranchHead(const std::string &branchName) {
@@ -227,7 +249,7 @@ bool GitRepository::exportHeadAsZip(const std::string &branchName,
   }
 
   // Step 2: Get tree hash from the commit
-  CommitObject commitObj;
+  CommitObject commitObj(gitDir);
   CommitData commitData = commitObj.readObject(commitHash);
   std::string treeHash = commitData.tree;
 
@@ -237,7 +259,7 @@ bool GitRepository::exportHeadAsZip(const std::string &branchName,
   std::filesystem::create_directory(tempDir);
 
   // Step 4: Restore working tree using existing recursive function
-  TreeObject treeObj;
+  TreeObject treeObj(gitDir);
   std::unordered_set<std::string> filePaths;
   treeObj.restoreTreeContents(treeHash, tempDir, filePaths);
 
@@ -268,7 +290,7 @@ bool GitRepository::isFullyMerged(const std::string &branchName) {
   }
 
   // Check for conflicts first
-  GitMerge merge;
+  GitMerge merge(gitDir);
   if (merge.checkForConflicts(currentBranch, branchName)) {
     std::cerr << "The branch '" << branchName
               << "' has conflicts with the current branch\n";
@@ -297,14 +319,28 @@ bool GitRepository::isFullyMerged(const std::string &branchName) {
   return true;
 }
 
-void GitRepository::reportMergeConflicts(const std::string &targetBranch) {
-  std::string currentBranch = getCurrentBranch();
-  std::cerr << "Conflicts found during merge:\n";
-  for (const auto &file : merge.getConflictingFiles()) {
-    std::cerr << "- " << file << " (" << merge.getFileConflictStatus(file)
-              << ")\n";
+bool GitRepository::reportMergeConflicts(const std::string &targetBranch) {
+  try {
+    if (!merge) {
+      std::cout << "No merge in progress or no conflicts to report.\n";
+      return false;
+    }
+    std::string currentBranch = getCurrentBranch();
+    std::vector<std::string> conflicts = merge->getConflictingFiles();
+    if (conflicts.empty()) {
+      std::cout << "No conflicts found during merge.\n";
+      return true;
+    }
+    std::cerr << "Conflicts found during merge:\n";
+    for (const auto &file : conflicts) {
+      std::cerr << "- " << file << " (" << merge->getFileConflictStatus(file)
+                << ")\n";
+    }
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "reportMergeConflicts failed: " << e.what() << std::endl;
+    return false;
   }
-  std::cerr << "\nResolve conflicts and run 'git merge --continue' when done\n";
 }
 
 bool GitRepository::mergeBranch(const std::string &targetBranch) {
@@ -331,16 +367,6 @@ bool GitRepository::mergeBranch(const std::string &targetBranch) {
 
     // Check for conflicts
     if (merge->checkForConflicts(currentBranch, targetBranch)) {
-      std::string commonAncestor =
-          merge->findCommonAncestor(currentHead, targetHead);
-      if (!commonAncestor.empty()) {
-        if (merge->threeWayMerge(currentHead, targetHead, commonAncestor)) {
-          // Three-way merge successful
-          std::cout
-              << "Three-way merge successful. Resolve conflicts and commit\n";
-          return false; // Return false to indicate conflicts need resolution
-        }
-      }
       reportMergeConflicts(targetBranch);
       return false; // Return false but don't throw to allow conflict resolution
     }
@@ -351,7 +377,7 @@ bool GitRepository::mergeBranch(const std::string &targetBranch) {
         std::cout << "Fast-forward merge successful\n";
         return true;
       }
-      std::cerr << "Failed to update branch head\n" << e.what() << std::endl;
+      std::cerr << "Failed to update branch head\n" << std::endl;
 
       // try {
       //   gitHead().updateHead(targetHead);
@@ -367,7 +393,7 @@ bool GitRepository::mergeBranch(const std::string &targetBranch) {
 
     // Create merge commit
     std::string message = "Merge branch '" + targetBranch + "'";
-    std::string author = GitConfig().getName() + " <" + GitConfig().getEmail() +
+    std::string author = GitConfig().getUserName() + " <" + GitConfig().getUserEmail() +
                          "> " + getCurrentTimestampWithTimezone();
 
     // Get tree from index
@@ -482,10 +508,14 @@ bool GitRepository::isConflicted(const std::string &path) {
   return idx.isConflicted(path);
 }
 
-void GitRepository::resolveConflict(const std::string &path,
-                                    const std::string &hash) {
-  IndexManager idx;
-  idx.resolveConflict(path, hash);
+bool GitRepository::resolveConflict(const std::string &path, const std::string &hash) {
+  try {
+    IndexManager idx;
+    return idx.resolveConflict(path, hash);
+  } catch (const std::exception &e) {
+    std::cerr << "resolveConflict failed: " << e.what() << std::endl;
+    return false;
+  }
 }
 
 std::optional<ConflictMarker>
@@ -506,11 +536,11 @@ bool GitRepository::createCommit(const std::string &message,
   }
 
   data.author = author.empty()
-                    ? GitConfig().getName() + " <" + GitConfig().getEmail() +
+                    ? GitConfig().getUserName() + " <" + GitConfig().getUserEmail() +
                           "> " + getCurrentTimestampWithTimezone()
                     : author;
 
-  data.committer = GitConfig().getName() + " <" + GitConfig().getEmail() +
+  data.committer = GitConfig().getUserName() + " <" + GitConfig().getUserEmail() +
                    "> " + getCurrentTimestampWithTimezone();
   data.message = message;
 
@@ -527,7 +557,7 @@ GitRepository::logBranchCommitHistory(const std::string &branchName) {
   std::string currHash = getHashOfBranchHead(branchName);
   std::unordered_set<std::string> commitList;
 
-  CommitObject commitObj;
+  CommitObject commitObj(gitDir);
 
   while (!currHash.empty()) {
     commitList.insert(currHash);
@@ -566,7 +596,7 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
     return false;
   }
 
-  CommitObject commitObj;
+  CommitObject commitObj(gitDir);
   CommitData commit = commitObj.readObject(hash);
 
   // Recursively clear current directory (except .git)
@@ -578,7 +608,7 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
 
   // Recursively checkout commit's tree into working directory
   // //yet to implement
-  TreeObject treeObj;
+  TreeObject treeObj(gitDir);
   treeObj.restoreWorkingDirectoryFromTreeHash(commit.tree, ".");
 
   // Update HEAD

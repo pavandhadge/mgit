@@ -1,5 +1,7 @@
-
 #include "headers/GitObjectStorage.hpp"
+#include "headers/GitObjectTypesClasses.hpp"
+#include "headers/HashUtils.hpp"
+#include "headers/ZlibUtils.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -7,10 +9,10 @@
 #include <string>
 #include <unordered_set>
 #include <filesystem>
-#include "headers/HashUtils.hpp"
+#include <iomanip>
+#include <algorithm>
 
-
-BlobObject::BlobObject() : type(GitObjectType::Blob), content({}) {}
+BlobObject::BlobObject(const std::string& gitDir) : GitObjectStorage(gitDir), type(GitObjectType::Blob), content({}) {}
 
 std::string BlobObject::writeObject(const std::string& path, const bool &write) {
     std::ifstream file(path, std::ios::binary);
@@ -19,21 +21,20 @@ std::string BlobObject::writeObject(const std::string& path, const bool &write) 
         return "";
     }
 
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
+    std::ostringstream data;
+    data << file.rdbuf();
+    std::string content = data.str();
     file.close();
 
-    BlobData data;
-    data.content = buffer.str();
-    content = data;
-
-    std::string blobHeader = "blob " + std::to_string(data.content.size()) + '\0';
-    std::string fullBlob = blobHeader + data.content;
-
+    // Always create the Git object header for hash calculation
+    std::string header = "blob " + std::to_string(content.size()) + '\0';
+    std::string fullContent = header + content;
+    
     if (write) {
-        return GitObjectStorage::writeObject(fullBlob);
+        return GitObjectStorage::writeObject(fullContent);
+    } else {
+        return hash_sha1(fullContent);
     }
-    return hash_sha1(fullBlob);
 }
 
 BlobData BlobObject::readObject(const std::string& hash) {
@@ -59,7 +60,7 @@ GitObjectType BlobObject::getType() const {
     return type;
 }
 
-TreeObject::TreeObject() : type(GitObjectType::Tree), content({}) {}
+TreeObject::TreeObject(const std::string& gitDir) : GitObjectStorage(gitDir), type(GitObjectType::Tree), content({}) {}
 
 std::string TreeObject::writeObject(const std::string& path) {
     std::vector<TreeEntry> entries;
@@ -75,11 +76,11 @@ std::string TreeObject::writeObject(const std::string& path) {
 
         if (std::filesystem::is_regular_file(entry)) {
             treeEntry.mode = "100644";
-            BlobObject blob;
+            BlobObject blob(getGitDir());
             treeEntry.hash = blob.writeObject(entry.path().string(), true);
         } else if (std::filesystem::is_directory(entry)) {
             treeEntry.mode = "040000";
-            TreeObject subTree;
+            TreeObject subTree(getGitDir());
             treeEntry.hash = subTree.writeObject(entry.path().string());
         } else {
             continue;
@@ -119,11 +120,16 @@ std::vector<TreeEntry> TreeObject::readObject(const std::string& hash) {
 
     while (i < treeBody.size()) {
         TreeEntry entry;
-        while (treeBody[i] != ' ') entry.mode += treeBody[i++];
+        // Parse mode
+        while (i < treeBody.size() && treeBody[i] != ' ') entry.mode += treeBody[i++];
+        if (i >= treeBody.size()) break;
         i++;
-        while (treeBody[i] != '\0') entry.filename += treeBody[i++];
+        // Parse filename
+        while (i < treeBody.size() && treeBody[i] != '\0') entry.filename += treeBody[i++];
+        if (i >= treeBody.size()) break;
         i++;
-
+        // Parse 20-byte hash
+        if (i + 20 > treeBody.size()) break;
         std::ostringstream hexHash;
         for (int j = 0; j < 20; ++j) {
             hexHash << std::hex << std::setw(2) << std::setfill('0')
@@ -157,7 +163,7 @@ void TreeObject::restoreTreeContents(const std::string &hash, const std::string 
 
         if (entity.mode == "100644" || entity.mode == "100755") {
             // File (blob)
-            BlobObject blobObj;
+            BlobObject blobObj(getGitDir());
             BlobData blob = blobObj.readObject(entity.hash);
 
             std::filesystem::create_directories(std::filesystem::path(fullPath).parent_path());
@@ -190,39 +196,27 @@ bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash, co
     return true;
 }
 
-
-
-
-
-//Commit)bject Class
-CommitObject::CommitObject() : type(GitObjectType::Commit), content({}) {}
+CommitObject::CommitObject(const std::string& gitDir) : GitObjectStorage(gitDir), type(GitObjectType::Commit), content({}) {}
 
 std::string CommitObject::writeObject(const CommitData& data) {
     std::ostringstream commitText;
 
-    // Tree
     commitText << "tree " << data.tree << "\n";
-
-    // Parents (can be zero or many)
+    
     for (const auto& parent : data.parents) {
         commitText << "parent " << parent << "\n";
     }
-
-    // Author (must be present)
+    
     commitText << "author " << data.author << "\n";
-
-    // Committer (must be present)
     commitText << "committer " << data.committer << "\n";
-
-    // Message (separated by a blank line)
     commitText << "\n" << data.message << "\n";
-    std::string body = commitText.str();
-    std::string header = "commit " + std::to_string(body.size()) + '\0';
+
+    std::string commitContent = commitText.str();
+    std::string header = "commit " + std::to_string(commitContent.size()) + '\0';
+    std::string fullContent = header + commitContent;
     content = data;
-    std::string fullContent = header+body;
     return GitObjectStorage::writeObject(fullContent);
 }
-
 
 CommitData CommitObject::readObject(const std::string& hash) {
     CommitData data;
@@ -270,7 +264,6 @@ CommitData CommitObject::readObject(const std::string& hash) {
     return data;
 }
 
-
 const CommitData& CommitObject::getContent() const {
     return content;
 }
@@ -279,12 +272,7 @@ GitObjectType CommitObject::getType() const {
     return type;
 }
 
-
-
-//tag object
-//
-
-TagObject::TagObject() : type(GitObjectType::Tag), content({}) {}
+TagObject::TagObject(const std::string& gitDir) : GitObjectStorage(gitDir), type(GitObjectType::Tag), content({}) {}
 
 std::string TagObject::writeObject(const TagData& data) {
     std::ostringstream tagStream;
@@ -303,9 +291,6 @@ std::string TagObject::writeObject(const TagData& data) {
 
     return GitObjectStorage::writeObject(fullTag);
 }
-
-
-
 
 TagData TagObject::readObject(const std::string& hash) {
     TagData tag;
@@ -353,12 +338,165 @@ TagData TagObject::readObject(const std::string& hash) {
     return tag;
 }
 
-
-
-const TagData TagObject::getContent() const {
+const TagData& TagObject::getContent() const {
     return content;
 }
 
 GitObjectType TagObject::getType() const {
     return type;
+}
+
+bool BlobObject::validateContent(const std::string& content) {
+    try {
+        if (content.empty()) {
+            throw ObjectException("Blob content cannot be empty");
+        }
+        
+        // Check for null bytes (which are not allowed in blob content)
+        if (content.find('\0') != std::string::npos) {
+            throw ObjectException("Blob content cannot contain null bytes");
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "BlobObject::validateContent failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool TreeObject::validateEntry(const TreeEntry& entry) {
+    try {
+        if (entry.filename.empty()) {
+            throw ObjectException("Tree entry filename cannot be empty");
+        }
+        
+        if (entry.hash.empty()) {
+            throw ObjectException("Tree entry hash cannot be empty");
+        }
+        
+        if (entry.hash.size() != 40) {
+            throw ObjectException("Invalid tree entry hash length: " + std::to_string(entry.hash.size()));
+        }
+        
+        if (!std::all_of(entry.hash.begin(), entry.hash.end(), ::isxdigit)) {
+            throw ObjectException("Invalid tree entry hash format");
+        }
+        
+        // Validate mode
+        if (entry.mode != "100644" && entry.mode != "100755" && entry.mode != "40000") {
+            throw ObjectException("Invalid tree entry mode: " + entry.mode);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "TreeObject::validateEntry failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool CommitObject::validateCommit(const std::string& treeHash, const std::string& message) {
+    try {
+        if (treeHash.empty()) {
+            throw ObjectException("Tree hash cannot be empty");
+        }
+        
+        if (message.empty()) {
+            throw ObjectException("Commit message cannot be empty");
+        }
+        
+        if (treeHash.size() != 40) {
+            throw ObjectException("Invalid tree hash length: " + std::to_string(treeHash.size()));
+        }
+        
+        if (!std::all_of(treeHash.begin(), treeHash.end(), ::isxdigit)) {
+            throw ObjectException("Invalid tree hash format");
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "CommitObject::validateCommit failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool BlobObject::updateContent(const std::string& newContent) {
+    try {
+        if (!validateContent(newContent)) {
+            return false;
+        }
+        
+        content.content = newContent;
+        
+        // Update storage
+        GitObjectStorage storage;
+        std::string header = "blob " + std::to_string(newContent.size()) + '\0';
+        std::string fullContent = header + newContent;
+        std::string hash = storage.writeObject(fullContent);
+        if (hash.empty()) {
+            throw ObjectException("Failed to update blob in storage");
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "BlobObject::updateContent failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool TreeObject::addEntry(const TreeEntry& entry) {
+    try {
+        if (!validateEntry(entry)) {
+            return false;
+        }
+        
+        // Check for duplicate filename
+        for (const auto& existingEntry : content) {
+            if (existingEntry.filename == entry.filename) {
+                throw ObjectException("Tree entry already exists: " + entry.filename);
+            }
+        }
+        
+        content.push_back(entry);
+        
+        // Re-serialize and update hash
+        std::string newHash = writeObject("."); // This will recreate the tree
+        if (newHash.empty()) {
+            throw ObjectException("Failed to update tree after adding entry");
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "TreeObject::addEntry failed: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool TreeObject::removeEntry(const std::string& filename) {
+    try {
+        if (filename.empty()) {
+            throw ObjectException("Filename cannot be empty");
+        }
+        
+        auto it = std::find_if(content.begin(), content.end(),
+                               [&filename](const TreeEntry& entry) {
+                                 return entry.filename == filename;
+                               });
+        
+        if (it == content.end()) {
+            throw ObjectException("Tree entry not found: " + filename);
+        }
+        
+        content.erase(it);
+        
+        // Re-serialize and update hash
+        std::string newHash = writeObject("."); // This will recreate the tree
+        if (newHash.empty()) {
+            throw ObjectException("Failed to update tree after removing entry");
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "TreeObject::removeEntry failed: " << e.what() << std::endl;
+        return false;
+    }
 }

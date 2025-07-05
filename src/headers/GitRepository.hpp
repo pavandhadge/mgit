@@ -19,6 +19,7 @@ private:
   std::unique_ptr<GitMerge> merge; // Use smart pointer for better ownership
   std::mutex mergeMutex;           // For thread safety
 
+public:
   // Helper methods
   std::string createMergeCommit(const std::string &message,
                                 const std::string &author,
@@ -27,9 +28,9 @@ private:
   bool resolveConflicts(const std::string &targetBranch);
 
 public:
-  void reportStatus(bool shortFormat = false, bool showUntracked = true);
+  bool reportStatus(bool shortFormat = false, bool showUntracked = true);
   GitRepository(const std::string &root = ".git");
-  void init(const std::string &path);
+  bool init(const std::string &path);
   // For blob/tree:
   std::string writeObject(GitObjectType type, const std::string &path,
                           const bool &write);
@@ -44,11 +45,11 @@ public:
   std::string readObjectRaw(const std::string &path);
   void indexHandler(const std::vector<std::string> &paths = {"."});
 
-  void CreateBranch(const std::string &branchName);
-  void listbranches(const std::string &branchName);
+  bool CreateBranch(const std::string &branchName);
+  bool listbranches(const std::string &branchName);
   std::string getCurrentBranch() const;
 
-  void changeCurrentBranch(const std::string &targetBranch, bool createflag);
+  bool changeCurrentBranch(const std::string &targetBranch, bool createflag);
 
   std::string getHashOfBranchHead(const std::string &branchName);
 
@@ -68,7 +69,7 @@ public:
   bool abortMerge();
   std::vector<std::string> getConflictingFiles();
   bool isConflicted(const std::string &path);
-  void resolveConflict(const std::string &path, const std::string &hash);
+  bool resolveConflict(const std::string &path, const std::string &hash);
   std::optional<ConflictMarker> getConflictMarker(const std::string &path);
-  void reportMergeConflicts(const std::string &targetBranch);
+  bool reportMergeConflicts(const std::string &targetBranch);
 };
