@@ -217,7 +217,7 @@ mgit/
 
 ## 🧑‍💻 Author
 
-**Sharad Etthar** — [@yourname](#)
+**Pavan Dhadge** — [@pavandhadge](https://github.com/pavandhadge)
 Learning Git internals, systems programming, and building devtools for developers.
 
 ---
