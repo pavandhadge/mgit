@@ -1,6 +1,6 @@
 #pragma once
 #include "GitRepository.hpp"
-#include "../utils/CLI11.hpp"
+#include <CLI/CLI.hpp>
 
 
 

@@ -57,3 +57,5 @@ vcpkg_installed
 
 
 test_evaluation/*
+
+external/CLI11

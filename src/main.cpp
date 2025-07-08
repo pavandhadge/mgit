@@ -1,7 +1,7 @@
 #include "headers/CLISetupAndHandlers.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/GitActivityLogger.hpp"
-#include "utils/CLI11.hpp"
+#include <CLI/CLI.hpp>
 #include <iostream>
 #include <exception>
 #include <vector>
