@@ -11,12 +11,31 @@ This project reimplements Git’s core concepts — blobs, trees, commits, tags,
 * ✅ Git-style object storage with `.git/objects`
 * ✅ SHA-1 hashing of file data (`mgit hash-object`)
 * ✅ Tree and directory snapshotting (`mgit write-tree`)
-* ✅ Commit creation with metadata (`mgit commit-tree`)
+* ✅ Commit creation with metadata (`mgit commit-tree` and `mgit commit`)
 * ✅ Annotated tagging (`mgit tag-object`)
-* ✅ Raw and pretty object reading (`mgit cat-file`, `mgit ls-tree`)
+* ✅ Raw and pretty object reading (`mgit cat-file`, `mgit ls-tree`, `mgit read-object`, `mgit ls-read`)
+* ✅ Staging/index support (`mgit add`)
+* ✅ Status reporting (`mgit status`)
+* ✅ Branch management (`mgit branch`, `mgit switch`, `mgit checkout`)
+* ✅ Merge operations and conflict resolution (`mgit merge`, `mgit merge-continue`, `mgit merge-abort`, `mgit resolve-conflict`)
+* ✅ Remote operations (`mgit push`, `mgit pull`, `mgit remote add/remove/list`)
+* ✅ Configuration management (`mgit config`)
+* ✅ Activity logging and analytics (`mgit activity` with subcommands: summary, performance, errors, analysis, timeline, health, workflow, slow, usage, stats, recent, export, raw, errors-raw, performance-raw)
 * ✅ CLI11-based CLI for clear UX
 * 🧑‍💻 Educational source code ideal for learning Git internals
 * 📝 **Comprehensive activity logging and AI-ready analysis**
+
+---
+
+## ⚠️ Important Note: CLI11 Dependency
+
+For the build to work, you must clone the CLI11 library into the `external/` directory:
+
+```sh
+git clone https://github.com/CLIUtils/CLI11.git external/CLI11
+```
+
+This is required for the CLI parsing functionality.
 
 ---
 
@@ -70,6 +89,8 @@ mgit/
 ├── .git/objects/  ← Created at runtime
 ├── vcpkg.json
 ├── mgit.sh
+├── external/
+│   └── CLI11/   ← Required for CLI parsing
 └── docs/
     ├── ARCHITECTURE.md
     └── API_REFERENCE.md
@@ -105,4 +126,4 @@ It's a personal project, educational journey, and exploration of simplicity in t
 
 ## License
 
-MIT (see LICENSE)
+**No license is currently set for this project. If you intend to use or contribute, please contact the author or open an issue to discuss licensing.**
