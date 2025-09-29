@@ -1,18 +1,36 @@
 #include "headers/CLISetupAndHandlers.hpp"
+#include "headers/GitActivityLogger.hpp"
 #include "headers/GitConfig.hpp"
 #include "headers/GitObjectStorage.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/ZlibUtils.hpp"
-#include "headers/GitActivityLogger.hpp"
 #include <CLI/CLI.hpp>
+#include <iomanip>
 #include <iostream>
 #include <vector>
-#include <iomanip>
 
 // ===================== INITIALIZATION =====================
 bool handleInit(GitRepository &repo, const std::string &path) {
   repo.init(path);
   std::cout << "Initialized empty Git repository in " << path << "\n";
+
+  std::string username, email;
+
+  GitConfig config(path);
+
+  std::cout << "Setting up user configuration.\n";
+  std::cout << "user.name: ";
+  std::getline(std::cin, username);
+  if (!username.empty()) {
+    config.setUserName(username);
+  }
+
+  std::cout << "user.email: ";
+  std::getline(std::cin, email);
+  if (!email.empty()) {
+    config.setUserEmail(email);
+  }
+
   return true;
 }
 
@@ -46,8 +64,8 @@ bool handleCommitTree(GitRepository &repo, const std::string &tree,
                           "> " + getCurrentTimestampWithTimezone()
                     : author;
 
-  data.committer = config.getUserName() + " <" + config.getUserEmail() +
-                   "> " + getCurrentTimestampWithTimezone();
+  data.committer = config.getUserName() + " <" + config.getUserEmail() + "> " +
+                   getCurrentTimestampWithTimezone();
   data.message = message;
 
   std::string hash = repo.writeObject(GitObjectType::Commit, data);
@@ -215,7 +233,8 @@ bool handleBranchCommand(GitRepository &repo, const std::string &branchName,
       return false;
     }
   } else {
-    std::cerr << "Cannot create branch: HEAD is empty or main branch ref does not exist.\n";
+    std::cerr << "Cannot create branch: HEAD is empty or main branch ref does "
+                 "not exist.\n";
     return false;
   }
 }
@@ -296,7 +315,8 @@ bool handleMergeStatus(GitRepository &repo) {
   return true;
 }
 
-bool handleResolveConflict(GitRepository& repo, const std::string& path, const std::string& hash) {
+bool handleResolveConflict(GitRepository &repo, const std::string &path,
+                           const std::string &hash) {
   if (repo.resolveConflict(path, hash)) {
     std::cout << "Conflict resolved for: " << path << "\n";
     return true;
@@ -306,179 +326,174 @@ bool handleResolveConflict(GitRepository& repo, const std::string& path, const s
   }
 }
 
-bool handleActivityLog(GitRepository& repo, const std::string& command, int limit) {
-    GitActivityLogger logger;
-    
-    if (command == "summary") {
-        std::cout << logger.generateDetailedSummary() << std::endl;
-        return true;
-    } else if (command == "stats") {
-        std::cout << logger.getDatabaseStats() << std::endl;
-        return true;
-    } else if (command == "recent") {
-        auto activities = logger.getRecentActivity(limit);
-        std::cout << "Recent Activity (last " << limit << " commands):\n";
-        std::cout << "==========================================\n";
-        for (const auto& activity : activities) {
-            std::cout << "[" << activity.timestamp << "] " << activity.command;
-            if (!activity.arguments.empty()) {
-                std::cout << " " << activity.arguments;
-            }
-            std::cout << " (exit: " << activity.exit_code << ")";
-            if (activity.execution_time_ms > 0) {
-                std::cout << " [" << std::fixed << std::setprecision(2) << activity.execution_time_ms << "ms]";
-            }
-            std::cout << "\n";
-            if (!activity.error_message.empty()) {
-                std::cout << "  Error: " << activity.error_message << "\n";
-            }
-        }
-        return true;
-    } else if (command == "usage") {
-        auto stats = logger.getCommandUsageStats();
-        std::cout << "Command Usage Statistics:\n";
-        std::cout << "========================\n";
-        for (const auto& stat : stats) {
-            std::cout << std::setw(15) << stat.first << ": " << stat.second << " times\n";
-        }
-        return true;
-    } else if (command == "performance") {
-        std::cout << logger.generatePerformanceReport() << std::endl;
-        return true;
-    } else if (command == "errors") {
-        std::cout << logger.generateErrorReport() << std::endl;
-        return true;
-    } else if (command == "analysis") {
-        std::cout << logger.generateUsagePatterns() << std::endl;
-        return true;
-    } else if (command == "timeline") {
-        std::cout << logger.generateTimelineReport(7) << std::endl;
-        return true;
-    } else if (command == "health") {
-        std::cout << logger.generateRepositoryHealthReport() << std::endl;
-        return true;
-    } else if (command == "workflow") {
-        std::cout << logger.generateWorkflowAnalysis() << std::endl;
-        return true;
-    } else if (command == "slow") {
-        std::cout << logger.generateSlowCommandsReport(1000.0) << std::endl;
-        return true;
-    } else if (command == "export") {
-        std::string csv_path = ".mgit/activity_export.csv";
-        if (logger.exportToCSV(csv_path)) {
-            std::cout << "Activity log exported to: " << csv_path << std::endl;
-        } else {
-            std::cerr << "Failed to export activity log" << std::endl;
-        }
-        return true;
-    } else if (command == "raw") {
-        std::cout << "=== RAW ACTIVITY LOG ===\n";
-        std::cout << logger.getLogFileContents("activity") << std::endl;
-        return true;
-    } else if (command == "errors-raw") {
-        std::cout << "=== RAW ERROR LOG ===\n";
-        std::cout << logger.getLogFileContents("errors") << std::endl;
-        return true;
-    } else if (command == "performance-raw") {
-        std::cout << "=== RAW PERFORMANCE LOG ===\n";
-        std::cout << logger.getLogFileContents("performance") << std::endl;
-        return true;
+bool handleActivityLog(GitRepository &repo, const std::string &command,
+                       int limit) {
+  GitActivityLogger logger;
+
+  if (command == "summary") {
+    std::cout << logger.generateDetailedSummary() << std::endl;
+    return true;
+  } else if (command == "stats") {
+    std::cout << logger.getDatabaseStats() << std::endl;
+    return true;
+  } else if (command == "recent") {
+    auto activities = logger.getRecentActivity(limit);
+    std::cout << "Recent Activity (last " << limit << " commands):\n";
+    std::cout << "==========================================\n";
+    for (const auto &activity : activities) {
+      std::cout << "[" << activity.timestamp << "] " << activity.command;
+      if (!activity.arguments.empty()) {
+        std::cout << " " << activity.arguments;
+      }
+      std::cout << " (exit: " << activity.exit_code << ")";
+      if (activity.execution_time_ms > 0) {
+        std::cout << " [" << std::fixed << std::setprecision(2)
+                  << activity.execution_time_ms << "ms]";
+      }
+      std::cout << "\n";
+      if (!activity.error_message.empty()) {
+        std::cout << "  Error: " << activity.error_message << "\n";
+      }
     }
-    
-    std::cerr << "Unknown activity log command: " << command << std::endl;
-    std::cerr << "Available commands: summary, stats, recent, usage, performance, errors, analysis, timeline, health, workflow, slow, export, raw, errors-raw, performance-raw" << std::endl;
-    return false;
+    return true;
+  } else if (command == "usage") {
+    auto stats = logger.getCommandUsageStats();
+    std::cout << "Command Usage Statistics:\n";
+    std::cout << "========================\n";
+    for (const auto &stat : stats) {
+      std::cout << std::setw(15) << stat.first << ": " << stat.second
+                << " times\n";
+    }
+    return true;
+  } else if (command == "performance") {
+    std::cout << logger.generatePerformanceReport() << std::endl;
+    return true;
+  } else if (command == "errors") {
+    std::cout << logger.generateErrorReport() << std::endl;
+    return true;
+  } else if (command == "analysis") {
+    std::cout << logger.generateUsagePatterns() << std::endl;
+    return true;
+  } else if (command == "timeline") {
+    std::cout << logger.generateTimelineReport(7) << std::endl;
+    return true;
+  } else if (command == "health") {
+    std::cout << logger.generateRepositoryHealthReport() << std::endl;
+    return true;
+  } else if (command == "workflow") {
+    std::cout << logger.generateWorkflowAnalysis() << std::endl;
+    return true;
+  } else if (command == "slow") {
+    std::cout << logger.generateSlowCommandsReport(1000.0) << std::endl;
+    return true;
+  } else if (command == "export") {
+    std::string csv_path = ".mgit/activity_export.csv";
+    if (logger.exportToCSV(csv_path)) {
+      std::cout << "Activity log exported to: " << csv_path << std::endl;
+    } else {
+      std::cerr << "Failed to export activity log" << std::endl;
+    }
+    return true;
+  } else if (command == "raw") {
+    std::cout << "=== RAW ACTIVITY LOG ===\n";
+    std::cout << logger.getLogFileContents("activity") << std::endl;
+    return true;
+  } else if (command == "errors-raw") {
+    std::cout << "=== RAW ERROR LOG ===\n";
+    std::cout << logger.getLogFileContents("errors") << std::endl;
+    return true;
+  } else if (command == "performance-raw") {
+    std::cout << "=== RAW PERFORMANCE LOG ===\n";
+    std::cout << logger.getLogFileContents("performance") << std::endl;
+    return true;
+  }
+
+  std::cerr << "Unknown activity log command: " << command << std::endl;
+  std::cerr << "Available commands: summary, stats, recent, usage, "
+               "performance, errors, analysis, timeline, health, workflow, "
+               "slow, export, raw, errors-raw, performance-raw"
+            << std::endl;
+  return false;
 }
 
 // ==================== PUSH/PULL OPERATIONS ====================
 bool handlePushCommand(GitRepository &repo, const std::string &remoteGitDir) {
-    if (repo.push(remoteGitDir)) {
-        std::cout << "Push to " << remoteGitDir << " successful.\n";
-        return true;
-    } else {
-        std::cerr << "Push failed.\n";
-        return false;
-    }
+  if (repo.push(remoteGitDir)) {
+    std::cout << "Push to " << remoteGitDir << " successful.\n";
+    return true;
+  } else {
+    std::cerr << "Push failed.\n";
+    return false;
+  }
 }
 
 bool handlePullCommand(GitRepository &repo, const std::string &remoteGitDir) {
-    if (repo.pull(remoteGitDir)) {
-        std::cout << "Pull from " << remoteGitDir << " successful.\n";
-        return true;
-    } else {
-        std::cerr << "Pull failed.\n";
-        return false;
-    }
+  if (repo.pull(remoteGitDir)) {
+    std::cout << "Pull from " << remoteGitDir << " successful.\n";
+    return true;
+  } else {
+    std::cerr << "Pull failed.\n";
+    return false;
+  }
 }
 
 // ==================== REMOTE MANAGEMENT ====================
-bool handleRemoteAdd(GitRepository &repo, const std::string &name, const std::string &path) {
-    GitConfig config(GitConfig::findGitDir());
-    if (config.addRemote(name, path)) {
-        std::cout << "Added remote '" << name << "' -> " << path << "\n";
-        return true;
-    } else {
-        std::cerr << "Failed to add remote.\n";
-        return false;
-    }
+bool handleRemoteAdd(GitRepository &repo, const std::string &name,
+                     const std::string &path) {
+  GitConfig config(GitConfig::findGitDir());
+  if (config.addRemote(name, path)) {
+    std::cout << "Added remote '" << name << "' -> " << path << "\n";
+    return true;
+  } else {
+    std::cerr << "Failed to add remote.\n";
+    return false;
+  }
 }
 
 bool handleRemoteRemove(GitRepository &repo, const std::string &name) {
-    GitConfig config(GitConfig::findGitDir());
-    if (config.removeRemote(name)) {
-        std::cout << "Removed remote '" << name << "'\n";
-        return true;
-    } else {
-        std::cerr << "Failed to remove remote.\n";
-        return false;
-    }
+  GitConfig config(GitConfig::findGitDir());
+  if (config.removeRemote(name)) {
+    std::cout << "Removed remote '" << name << "'\n";
+    return true;
+  } else {
+    std::cerr << "Failed to remove remote.\n";
+    return false;
+  }
 }
 
 bool handleRemoteList(GitRepository &repo) {
-    GitConfig config(GitConfig::findGitDir());
-    auto remotes = config.listRemotes();
-    if (remotes.empty()) {
-        std::cout << "No remotes found.\n";
-        return true;
-    }
-    std::cout << "Remotes:\n";
-    for (const auto &r : remotes) {
-        std::cout << "  " << r.first << "\t" << r.second << "\n";
-    }
+  GitConfig config(GitConfig::findGitDir());
+  auto remotes = config.listRemotes();
+  if (remotes.empty()) {
+    std::cout << "No remotes found.\n";
     return true;
+  }
+  std::cout << "Remotes:\n";
+  for (const auto &r : remotes) {
+    std::cout << "  " << r.first << "\t" << r.second << "\n";
+  }
+  return true;
 }
 
 // ==================== USER CONFIG ====================
-bool handleConfigSet(GitRepository&, const std::string& key, const std::string& value) {
-    GitConfig config(GitConfig::findGitDir());
-    if (key == "user.name") {
-        if (config.setUserName(value)) {
-            std::cout << "Set user.name to '" << value << "'\n";
-            return true;
-        }
-    } else if (key == "user.email") {
-        if (config.setUserEmail(value)) {
-            std::cout << "Set user.email to '" << value << "'\n";
-            return true;
-        }
-    }
-    std::cerr << "Failed to set config for '" << key << "'\n";
-    return false;
+bool handleConfigSet(GitRepository &, const std::string &key,
+                     const std::string &value) {
+  GitConfig config(GitConfig::findGitDir());
+  if (config.setConfig(key, value)) {
+    return true;
+  }
+  std::cerr << "Failed to set config for '" << key << "'\n";
+  return false;
 }
 
-bool handleConfigGet(GitRepository&, const std::string& key) {
-    GitConfig config(GitConfig::findGitDir());
-    std::string value;
-    if (key == "user.name") {
-        value = config.getUserName();
-    } else if (key == "user.email") {
-        value = config.getUserEmail();
-    } else {
-        std::cerr << "Unknown config key: '" << key << "'\n";
-        return false;
-    }
+bool handleConfigGet(GitRepository &, const std::string &key) {
+  GitConfig config(GitConfig::findGitDir());
+  std::string value;
+  if (config.getConfig(key, value)) {
     std::cout << value << "\n";
     return true;
+  }
+  return false;
 }
 
 // ==================== CLI SETUP FUNCTIONS ====================
@@ -491,8 +506,10 @@ bool setupInitCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand("init", "Initialize Git repository");
   auto initPath = std::make_shared<std::string>(".git");
   auto bareFlag = std::make_shared<bool>(false);
-  cmd->add_option("path", *initPath, "Path to initialize repository")->default_val(".git");
-  cmd->add_flag("--bare", *bareFlag, "(Not supported) Create a bare repository");
+  cmd->add_option("path", *initPath, "Path to initialize repository")
+      ->default_val(".git");
+  cmd->add_flag("--bare", *bareFlag,
+                "(Not supported) Create a bare repository");
   cmd->callback([&repo, initPath, bareFlag]() {
     if (*bareFlag) {
       std::cerr << "Error: bare repositories are not supported.\n";
@@ -508,7 +525,9 @@ bool setupHashObjectCommand(CLI::App &app, GitRepository &repo) {
   auto writeFlag = std::make_shared<bool>(false);
   auto cmd = app.add_subcommand(
       "hash-object", "Compute object ID and optionally creates blob");
-  cmd->add_option("file", *filePath, "Path to file")->required()->check(CLI::ExistingFile);
+  cmd->add_option("file", *filePath, "Path to file")
+      ->required()
+      ->check(CLI::ExistingFile);
   cmd->add_flag("-w", *writeFlag, "Write object to database");
   cmd->callback([&repo, filePath, writeFlag]() {
     return handleHashObject(repo, *filePath, *writeFlag);
@@ -518,10 +537,12 @@ bool setupHashObjectCommand(CLI::App &app, GitRepository &repo) {
 
 bool setupWriteTreeCommand(CLI::App &app, GitRepository &repo) {
   auto directoryPath = std::make_shared<std::string>();
-  auto cmd = app.add_subcommand("write-tree", "Create tree object from current index");
-  cmd->add_option("directory", *directoryPath, "Directory to write tree from")->default_val(".");
-  cmd->callback([&repo, directoryPath]() { 
-    return handleWriteTree(repo, *directoryPath); 
+  auto cmd =
+      app.add_subcommand("write-tree", "Create tree object from current index");
+  cmd->add_option("directory", *directoryPath, "Directory to write tree from")
+      ->default_val(".");
+  cmd->callback([&repo, directoryPath]() {
+    return handleWriteTree(repo, *directoryPath);
   });
   return true;
 }
@@ -557,7 +578,8 @@ bool setupTagObjectCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_option("--tagger", *tagger, "Tagger information");
   cmd->positionals_at_end();
   cmd->callback([&repo, objectHash, objectType, tagName, message, tagger]() {
-    return handleTagObject(repo, *objectHash, *objectType, *tagName, *message, *tagger);
+    return handleTagObject(repo, *objectHash, *objectType, *tagName, *message,
+                           *tagger);
   });
   return true;
 }
@@ -566,9 +588,8 @@ bool setupReadObjectCommand(CLI::App &app, GitRepository &repo) {
   auto objectHash = std::make_shared<std::string>();
   auto cmd = app.add_subcommand("read-object", "Read raw object content");
   cmd->add_option("hash", *objectHash, "Object hash")->required();
-  cmd->callback([&repo, objectHash]() { 
-    return handleReadObject(repo, *objectHash); 
-  });
+  cmd->callback(
+      [&repo, objectHash]() { return handleReadObject(repo, *objectHash); });
   return true;
 }
 
@@ -592,9 +613,8 @@ bool setupLsReadCommand(CLI::App &app, GitRepository &repo) {
   auto objectHash = std::make_shared<std::string>();
   auto cmd = app.add_subcommand("ls-read", "Read and parse object content");
   cmd->add_option("hash", *objectHash, "Object hash")->required();
-  cmd->callback([&repo, objectHash]() { 
-    return handleLsRead(repo, *objectHash); 
-  });
+  cmd->callback(
+      [&repo, objectHash]() { return handleLsRead(repo, *objectHash); });
   return true;
 }
 
@@ -602,9 +622,7 @@ bool setupLsTreeCommand(CLI::App &app, GitRepository &repo) {
   auto treeHash = std::make_shared<std::string>();
   auto cmd = app.add_subcommand("ls-tree", "List tree contents");
   cmd->add_option("hash", *treeHash, "Tree object hash")->required();
-  cmd->callback([&repo, treeHash]() { 
-    return handleLsTree(repo, *treeHash); 
-  });
+  cmd->callback([&repo, treeHash]() { return handleLsTree(repo, *treeHash); });
   return true;
 }
 
@@ -612,9 +630,7 @@ bool setupAddCommand(CLI::App &app, GitRepository &repo) {
   auto paths = std::make_shared<std::vector<std::string>>();
   auto cmd = app.add_subcommand("add", "Add files to index");
   cmd->add_option("paths", *paths, "Files to add")->required()->expected(-1);
-  cmd->callback([&repo, paths]() { 
-    return handleAddCommand(repo, *paths); 
-  });
+  cmd->callback([&repo, paths]() { return handleAddCommand(repo, *paths); });
   return true;
 }
 
@@ -629,7 +645,8 @@ bool setupStatusCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_flag("-i,--ignored", *showIgnored, "Show ignored files");
   cmd->add_flag("-b,--branch", *showBranch, "Show branch information");
   cmd->callback([&repo, shortFormat, showUntracked, showIgnored, showBranch]() {
-    return handleStatusCommand(repo, *shortFormat, *showUntracked, *showIgnored, *showBranch);
+    return handleStatusCommand(repo, *shortFormat, *showUntracked, *showIgnored,
+                               *showBranch);
   });
   return true;
 }
@@ -652,8 +669,8 @@ bool setupBranchCommand(CLI::App &app, GitRepository &repo) {
 
   cmd->callback([&repo, branchName, newBranchName, deleteFlag, forceDelete,
                  listFlag, showCurrent]() {
-    return handleBranchCommand(repo, *branchName, *deleteFlag, *forceDelete, *listFlag,
-                        *showCurrent, *newBranchName);
+    return handleBranchCommand(repo, *branchName, *deleteFlag, *forceDelete,
+                               *listFlag, *showCurrent, *newBranchName);
   });
   return true;
 }
@@ -675,7 +692,8 @@ bool setupCheckoutCommand(CLI::App &app, GitRepository &repo) {
   auto createFlag = std::make_shared<bool>(false);
   auto cmd = app.add_subcommand(
       "checkout", "Switch branches or restore working tree files");
-  cmd->add_option("branch", *branchName, "Branch name to switch to")->required();
+  cmd->add_option("branch", *branchName, "Branch name to switch to")
+      ->required();
   cmd->add_flag("-b", *createFlag, "Create and checkout new branch");
   cmd->callback([&repo, branchName, createFlag]() {
     return handleCheckoutBranch(repo, *branchName, *createFlag);
@@ -688,8 +706,8 @@ bool setupMergeCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand(
       "merge", "Join two or more development histories together");
   cmd->add_option("branch", *targetBranch, "Branch name to merge")->required();
-  cmd->callback([&repo, targetBranch]() { 
-    return handleMergeCommand(repo, *targetBranch); 
+  cmd->callback([&repo, targetBranch]() {
+    return handleMergeCommand(repo, *targetBranch);
   });
   return true;
 }
@@ -697,25 +715,19 @@ bool setupMergeCommand(CLI::App &app, GitRepository &repo) {
 bool setupMergeContinueCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand(
       "merge-continue", "Complete a merge after conflicts are resolved");
-  cmd->callback([&repo]() { 
-    return handleMergeContinue(repo); 
-  });
+  cmd->callback([&repo]() { return handleMergeContinue(repo); });
   return true;
 }
 
 bool setupMergeAbortCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand("merge-abort", "Abort a merge in progress");
-  cmd->callback([&repo]() { 
-    return handleMergeAbort(repo); 
-  });
+  cmd->callback([&repo]() { return handleMergeAbort(repo); });
   return true;
 }
 
 bool setupMergeStatusCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand("merge-status", "Show merge conflicts status");
-  cmd->callback([&repo]() { 
-    return handleMergeStatus(repo); 
-  });
+  cmd->callback([&repo]() { return handleMergeStatus(repo); });
   return true;
 }
 
@@ -729,8 +741,8 @@ bool setupResolveConflictCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_option("hash", *hash, "Hash of the version to keep")
       ->required()
       ->type_name("HASH");
-  cmd->callback([&repo, path, hash]() { 
-    return handleResolveConflict(repo, *path, *hash); 
+  cmd->callback([&repo, path, hash]() {
+    return handleResolveConflict(repo, *path, *hash);
   });
   return true;
 }
@@ -738,9 +750,13 @@ bool setupResolveConflictCommand(CLI::App &app, GitRepository &repo) {
 bool setupActivityLogCommand(CLI::App &app, GitRepository &repo) {
   auto command = std::make_shared<std::string>();
   auto limit = std::make_shared<int>(10);
-  auto cmd = app.add_subcommand("activity", "View activity logs and statistics");
-  cmd->add_option("command", *command, "Activity command (summary, stats, recent, usage)")->required();
-  cmd->add_option("-l,--limit", *limit, "Limit for recent commands")->default_val(10);
+  auto cmd =
+      app.add_subcommand("activity", "View activity logs and statistics");
+  cmd->add_option("command", *command,
+                  "Activity command (summary, stats, recent, usage)")
+      ->required();
+  cmd->add_option("-l,--limit", *limit, "Limit for recent commands")
+      ->default_val(10);
   cmd->callback([&repo, command, limit]() {
     return handleActivityLog(repo, *command, *limit);
   });
@@ -748,81 +764,84 @@ bool setupActivityLogCommand(CLI::App &app, GitRepository &repo) {
 }
 
 bool setupPushCommand(CLI::App &app, GitRepository &repo) {
-    auto remoteGitDir = std::make_shared<std::string>();
-    auto cmd = app.add_subcommand("push", "Push to remote .git directory");
-    cmd->add_option("remote", *remoteGitDir, "Remote .git directory path")->required();
-    cmd->callback([&repo, remoteGitDir]() {
-        return handlePushCommand(repo, *remoteGitDir);
-    });
-    return true;
+  auto remoteGitDir = std::make_shared<std::string>();
+  auto cmd = app.add_subcommand("push", "Push to remote .git directory");
+  cmd->add_option("remote", *remoteGitDir, "Remote .git directory path")
+      ->required();
+  cmd->callback([&repo, remoteGitDir]() {
+    return handlePushCommand(repo, *remoteGitDir);
+  });
+  return true;
 }
 
 bool setupPullCommand(CLI::App &app, GitRepository &repo) {
-    auto remoteGitDir = std::make_shared<std::string>();
-    auto cmd = app.add_subcommand("pull", "Pull from remote .git directory");
-    cmd->add_option("remote", *remoteGitDir, "Remote .git directory path")->required();
-    cmd->callback([&repo, remoteGitDir]() {
-        return handlePullCommand(repo, *remoteGitDir);
-    });
-    return true;
+  auto remoteGitDir = std::make_shared<std::string>();
+  auto cmd = app.add_subcommand("pull", "Pull from remote .git directory");
+  cmd->add_option("remote", *remoteGitDir, "Remote .git directory path")
+      ->required();
+  cmd->callback([&repo, remoteGitDir]() {
+    return handlePullCommand(repo, *remoteGitDir);
+  });
+  return true;
 }
 
 bool setupRemoteCommand(CLI::App &app, GitRepository &repo) {
-    auto remoteCmd = app.add_subcommand("remote", "Manage set of tracked repositories");
+  auto remoteCmd =
+      app.add_subcommand("remote", "Manage set of tracked repositories");
 
-    // remote add <name> <path>
-    auto addCmd = remoteCmd->add_subcommand("add", "Add a remote");
-    auto addName = std::make_shared<std::string>();
-    auto addPath = std::make_shared<std::string>();
-    addCmd->add_option("name", *addName, "Remote name")->required();
-    addCmd->add_option("path", *addPath, "Remote path")->required();
-    addCmd->callback([&repo, addName, addPath]() {
-        return handleRemoteAdd(repo, *addName, *addPath);
-    });
+  // remote add <name> <path>
+  auto addCmd = remoteCmd->add_subcommand("add", "Add a remote");
+  auto addName = std::make_shared<std::string>();
+  auto addPath = std::make_shared<std::string>();
+  addCmd->add_option("name", *addName, "Remote name")->required();
+  addCmd->add_option("path", *addPath, "Remote path")->required();
+  addCmd->callback([&repo, addName, addPath]() {
+    return handleRemoteAdd(repo, *addName, *addPath);
+  });
 
-    // remote remove <name>
-    auto removeCmd = remoteCmd->add_subcommand("remove", "Remove a remote");
-    auto removeName = std::make_shared<std::string>();
-    removeCmd->add_option("name", *removeName, "Remote name")->required();
-    removeCmd->callback([&repo, removeName]() {
-        return handleRemoteRemove(repo, *removeName);
-    });
+  // remote remove <name>
+  auto removeCmd = remoteCmd->add_subcommand("remove", "Remove a remote");
+  auto removeName = std::make_shared<std::string>();
+  removeCmd->add_option("name", *removeName, "Remote name")->required();
+  removeCmd->callback(
+      [&repo, removeName]() { return handleRemoteRemove(repo, *removeName); });
 
-    // remote list
-    auto listCmd = remoteCmd->add_subcommand("list", "List remotes");
-    listCmd->callback([&repo]() {
-        return handleRemoteList(repo);
-    });
+  // remote list
+  auto listCmd = remoteCmd->add_subcommand("list", "List remotes");
+  listCmd->callback([&repo]() { return handleRemoteList(repo); });
 
-    return true;
+  return true;
 }
 
 bool setupConfigCommand(CLI::App &app, GitRepository &repo) {
-    auto configCmd = app.add_subcommand("config", "Get or set repository/user options");
-    auto key = std::make_shared<std::string>();
-    auto value = std::make_shared<std::string>();
-    configCmd->add_option("key", *key, "Config key (user.name or user.email)")->required();
-    configCmd->add_option("value", *value, "Value to set (if omitted, prints value)");
-    configCmd->callback([&repo, key, value]() {
-        if (value->empty()) {
-            return handleConfigGet(repo, *key);
-        } else {
-            return handleConfigSet(repo, *key, *value);
-        }
-    });
-    return true;
+  auto configCmd =
+      app.add_subcommand("config", "Get or set repository/user options");
+  auto key = std::make_shared<std::string>();
+  auto value = std::make_shared<std::string>();
+  configCmd->add_option("key", *key, "Config key (user.name or user.email)")
+      ->required();
+  configCmd->add_option("value", *value,
+                        "Value to set (if omitted, prints value)");
+  configCmd->callback([&repo, key, value]() {
+    if (value->empty()) {
+      return handleConfigGet(repo, *key);
+    } else {
+      return handleConfigSet(repo, *key, *value);
+    }
+  });
+  return true;
 }
 
 bool setupCommitCommand(CLI::App &app, GitRepository &repo) {
-    auto message = std::make_shared<std::string>();
-    auto author = std::make_shared<std::string>("");
-    auto cmd = app.add_subcommand("commit", "Record changes to the repository");
-    cmd->add_option("-m,--message", *message, "Commit message")->required();
-    cmd->add_option("--author", *author, "Commit author");
-    cmd->callback([&repo, message, author]() {
-        return handleCommitCommand(repo, *message, *author);
-    });
-    return true;
+  auto message = std::make_shared<std::string>();
+  auto author = std::make_shared<std::string>("");
+  auto cmd = app.add_subcommand("commit", "Record changes to the repository");
+  cmd->add_option("-m,--message", *message, "Commit message")->required();
+  cmd->add_option("--author", *author, "Commit author");
+  cmd->callback([&repo, message, author]() {
+    return handleCommitCommand(repo, *message, *author);
+  });
+  return true;
 }
 
 bool setupLogCommand(CLI::App &app, GitRepository &repo) {
@@ -835,7 +854,7 @@ bool setupLogCommand(CLI::App &app, GitRepository &repo) {
 }
 
 // ==================== MAIN APP SETUP ====================
-bool setupAllCommands(CLI::App& app, GitRepository* repoPtr) {
+bool setupAllCommands(CLI::App &app, GitRepository *repoPtr) {
   setupCLIAppHelp(app);
   setupInitCommand(app, *repoPtr);
   setupHashObjectCommand(app, *repoPtr);
@@ -866,16 +885,17 @@ bool setupAllCommands(CLI::App& app, GitRepository* repoPtr) {
   return true;
 }
 
-bool handleCommitCommand(GitRepository &repo, const std::string &message, const std::string &author) {
-    if (message.empty()) {
-        std::cerr << "Commit message required.\n";
-        return false;
-    }
-    if (repo.createCommit(message, author)) {
-        std::cout << "Commit created successfully.\n";
-        return true;
-    } else {
-        std::cerr << "Commit failed.\n";
-        return false;
-    }
+bool handleCommitCommand(GitRepository &repo, const std::string &message,
+                         const std::string &author) {
+  if (message.empty()) {
+    std::cerr << "Commit message required.\n";
+    return false;
+  }
+  if (repo.createCommit(message, author)) {
+    std::cout << "Commit created successfully.\n";
+    return true;
+  } else {
+    std::cerr << "Commit failed.\n";
+    return false;
+  }
 }

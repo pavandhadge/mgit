@@ -1,3 +1,4 @@
+#include "headers/GitRepository.hpp"
 #include "headers/GitBranch.hpp"
 #include "headers/GitConfig.hpp"
 #include "headers/GitHead.hpp"
@@ -5,9 +6,8 @@
 #include "headers/GitInit.hpp"
 #include "headers/GitMerge.hpp"
 #include "headers/GitObjectStorage.hpp"
-#include "headers/GitRepository.hpp"
-#include "headers/ZlibUtils.hpp"
 #include "headers/GitObjectTypesClasses.hpp"
+#include "headers/ZlibUtils.hpp"
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -16,7 +16,8 @@
 #include <unordered_set>
 #include <vector>
 
-GitRepository::GitRepository(const std::string &root) : gitDir(root), merge(std::make_unique<GitMerge>(gitDir)) {}
+GitRepository::GitRepository(const std::string &root)
+    : gitDir(root), merge(std::make_unique<GitMerge>(gitDir)) {}
 
 bool GitRepository::init(const std::string &path) {
   try {
@@ -152,34 +153,76 @@ void GitRepository::indexHandler(const std::vector<std::string> &paths) {
 bool GitRepository::reportStatus(bool shortFormat, bool showUntracked) {
   try {
     IndexManager idx(gitDir);
-    std::vector<std::pair<std::string, std::string>> changes = idx.computeStatus();
+    std::vector<std::pair<std::string, std::string>> changes =
+        idx.computeStatus();
     std::ostringstream out;
-    // Print branch info like git
     out << "On branch " << getCurrentBranch() << "\n";
-    if (changes.empty()) {
-      out << "nothing to commit, working tree clean\n";
-    } else {
-      bool hasStaged = false;
-      bool hasUnstaged = false;
-      for (const auto& change : changes) {
-        if (change.first == "staged") {
-          if (!hasStaged) {
-            out << "\nChanges to be committed:\n";
-            hasStaged = true;
-          }
-          out << "  modified: " << change.second << "\n";
-        } else if (change.first == "unstaged") {
-          if (!hasUnstaged) {
-            out << "\nChanges not staged for commit:\n";
-            hasUnstaged = true;
-          }
-          out << "  modified: " << change.second << "\n";
-        }
+
+    std::string headCommitHash = getHashOfBranchHead(getCurrentBranch());
+    if (headCommitHash.empty()) {
+      out << "\nNo commits yet\n";
+    }
+
+    std::vector<std::string> modified;
+    std::vector<std::string> deleted;
+    std::vector<std::string> untracked;
+
+    for (const auto &change : changes) {
+      if (change.first == "modified:") {
+        modified.push_back(change.second);
+      } else if (change.first == "deleted:") {
+        deleted.push_back(change.second);
+      } else if (change.first == "untracked:") {
+        untracked.push_back(change.second);
       }
     }
+
+    // NOTE: This implementation only shows unstaged changes (working directory
+    // vs index) and untracked files. It does not show staged changes (index vs
+    // HEAD).
+
+    if (modified.empty() && deleted.empty() && untracked.empty()) {
+      out << "\nnothing to commit, working tree clean\n";
+      std::cout << out.str();
+      return true;
+    }
+
+    if (!modified.empty() || !deleted.empty()) {
+      out << "\nChanges not staged for commit:\n";
+      out << "  (use \"mgit add <file>...\" to update what will be "
+             "committed)\n";
+      out << "  (use \"mgit checkout -- <file>...\" to discard changes in "
+             "working directory)\n";
+      for (const auto &path : modified) {
+        out << "\tmodified:   " << path << "\n";
+      }
+      for (const auto &path : deleted) {
+        out << "\tdeleted:    " << path << "\n";
+      }
+      out << "\n";
+    }
+
+    if (showUntracked && !untracked.empty()) {
+      out << "Untracked files:\n";
+      out << "  (use \"mgit add <file>...\" to include in what will be "
+             "committed)\n";
+      for (const auto &path : untracked) {
+        out << "\t" << path << "\n";
+      }
+      out << "\n";
+    }
+
+    if (!modified.empty() || !deleted.empty()) {
+      out << "no changes added to commit (use \"mgit add\" and/or \"mgit "
+             "commit -a\")\n";
+    } else if (!untracked.empty()) {
+      out << "nothing added to commit but untracked files present (use \"mgit "
+             "add\" to track)\n";
+    }
+
     std::cout << out.str();
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "Status failed: " << e.what() << std::endl;
     return false;
   }
@@ -195,17 +238,17 @@ bool GitRepository::CreateBranch(const std::string &branchName) {
   }
 }
 
-bool GitRepository::listbranches(const std::string& branchName) {
-    try {
-        Branch branchObj;
-        if (!branchObj.listBranches()) {
-            throw std::runtime_error("Failed to list branches");
-        }
-        return true;
-    } catch (const std::exception& e) {
-        std::cerr << "listbranches failed: " << e.what() << std::endl;
-        return false;
+bool GitRepository::listbranches(const std::string &branchName) {
+  try {
+    Branch branchObj;
+    if (!branchObj.listBranches()) {
+      throw std::runtime_error("Failed to list branches");
     }
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "listbranches failed: " << e.what() << std::endl;
+    return false;
+  }
 }
 
 std::string GitRepository::getCurrentBranch() const {
@@ -213,10 +256,12 @@ std::string GitRepository::getCurrentBranch() const {
   return branchObj.getCurrentBranch();
 }
 
-bool GitRepository::changeCurrentBranch(const std::string &targetBranch, bool createflag) {
+bool GitRepository::changeCurrentBranch(const std::string &targetBranch,
+                                        bool createflag) {
   try {
     if (createflag) {
-      if (!CreateBranch(targetBranch)) return false;
+      if (!CreateBranch(targetBranch))
+        return false;
     }
     Branch branchObj;
     gitHead head;
@@ -399,13 +444,15 @@ bool GitRepository::mergeBranch(const std::string &targetBranch) {
       return false;
     }
     if (userEmail == "your@email.com") {
-      std::cerr << "fatal: unable to auto-detect email address (user.email not set)\n";
+      std::cerr << "fatal: unable to auto-detect email address (user.email not "
+                   "set)\n";
       return false;
     }
 
     // Create merge commit
     std::string message = "Merge branch '" + targetBranch + "'";
-    std::string author = userName + " <" + userEmail + "> " + getCurrentTimestampWithTimezone();
+    std::string author =
+        userName + " <" + userEmail + "> " + getCurrentTimestampWithTimezone();
 
     // Get tree from index
     std::string treeHash = writeObject(GitObjectType::Tree, ".", true);
@@ -517,7 +564,8 @@ bool GitRepository::isConflicted(const std::string &path) {
   return idx.isConflicted(path);
 }
 
-bool GitRepository::resolveConflict(const std::string &path, const std::string &hash) {
+bool GitRepository::resolveConflict(const std::string &path,
+                                    const std::string &hash) {
   try {
     IndexManager idx(gitDir);
     return idx.resolveConflict(path, hash);
@@ -544,7 +592,8 @@ bool GitRepository::createCommit(const std::string &message,
     return false;
   }
   if (userEmail == "your@email.com") {
-    std::cerr << "fatal: unable to auto-detect email address (user.email not set)\n";
+    std::cerr
+        << "fatal: unable to auto-detect email address (user.email not set)\n";
     return false;
   }
   CommitData data;
@@ -553,10 +602,11 @@ bool GitRepository::createCommit(const std::string &message,
   if (!parent.empty()) {
     data.parents.push_back(parent);
   }
-  data.author = author.empty()
-                    ? userName + " <" + userEmail + "> " + getCurrentTimestampWithTimezone()
-                    : author;
-  data.committer = userName + " <" + userEmail + "> " + getCurrentTimestampWithTimezone();
+  data.author = author.empty() ? userName + " <" + userEmail + "> " +
+                                     getCurrentTimestampWithTimezone()
+                               : author;
+  data.committer =
+      userName + " <" + userEmail + "> " + getCurrentTimestampWithTimezone();
   data.message = message;
   std::string hash = writeObject(GitObjectType::Commit, data);
   std::cout << "Commit object written: " << hash << "\n";
@@ -589,7 +639,8 @@ GitRepository::logBranchCommitHistory(const std::string &branchName) {
 bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
   std::string path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
   if (!std::filesystem::exists(path)) {
-    std::cerr << "No such commit exists. Ensure it is part of the current branch.\n";
+    std::cerr
+        << "No such commit exists. Ensure it is part of the current branch.\n";
     return false;
   }
   std::unordered_set<std::string> commitListInCurrentBranch(
@@ -602,7 +653,8 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
   IndexManager idx(gitDir);
   auto status = idx.computeStatus();
   if (!status.empty()) {
-    std::cerr << "Untracked or modified changes exist. Please commit/stash them before reset.\n";
+    std::cerr << "Untracked or modified changes exist. Please commit/stash "
+                 "them before reset.\n";
     return false;
   }
   CommitObject commitObj(gitDir);
@@ -621,93 +673,99 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
 }
 
 bool GitRepository::push(const std::string &remote) {
-    std::string remoteGitDir = remote;
-    // If not a path, try to resolve as remote name
-    if (remote.find('/') == std::string::npos && remote.find('.') == std::string::npos) {
-        GitConfig config(GitConfig::findGitDir());
-        std::string resolved;
-        if (config.getRemote(remote, resolved)) {
-            remoteGitDir = resolved;
-        } else {
-            std::cerr << "Remote '" << remote << "' not found in config.\n";
-            return false;
-        }
+  std::string remoteGitDir = remote;
+  // If not a path, try to resolve as remote name
+  if (remote.find('/') == std::string::npos &&
+      remote.find('.') == std::string::npos) {
+    GitConfig config(GitConfig::findGitDir());
+    std::string resolved;
+    if (config.getRemote(remote, resolved)) {
+      remoteGitDir = resolved;
+    } else {
+      std::cerr << "Remote '" << remote << "' not found in config.\n";
+      return false;
     }
-    namespace fs = std::filesystem;
-    std::string localObjects = gitDir + "/objects";
-    std::string remoteObjects = remoteGitDir + "/objects";
-    for (auto &dirEntry : fs::recursive_directory_iterator(localObjects)) {
-        if (dirEntry.is_regular_file()) {
-            std::string relPath = fs::relative(dirEntry.path(), localObjects).string();
-            fs::path remoteObjPath = fs::path(remoteObjects) / relPath;
-            if (!fs::exists(remoteObjPath.parent_path())) {
-                fs::create_directories(remoteObjPath.parent_path());
-            }
-            if (!fs::exists(remoteObjPath)) {
-                fs::copy_file(dirEntry.path(), remoteObjPath);
-            }
-        }
+  }
+  namespace fs = std::filesystem;
+  std::string localObjects = gitDir + "/objects";
+  std::string remoteObjects = remoteGitDir + "/objects";
+  for (auto &dirEntry : fs::recursive_directory_iterator(localObjects)) {
+    if (dirEntry.is_regular_file()) {
+      std::string relPath =
+          fs::relative(dirEntry.path(), localObjects).string();
+      fs::path remoteObjPath = fs::path(remoteObjects) / relPath;
+      if (!fs::exists(remoteObjPath.parent_path())) {
+        fs::create_directories(remoteObjPath.parent_path());
+      }
+      if (!fs::exists(remoteObjPath)) {
+        fs::copy_file(dirEntry.path(), remoteObjPath);
+      }
     }
-    std::string localRefs = gitDir + "/refs/heads";
-    std::string remoteRefs = remoteGitDir + "/refs/heads";
-    for (auto &dirEntry : fs::recursive_directory_iterator(localRefs)) {
-        if (dirEntry.is_regular_file()) {
-            std::string relPath = fs::relative(dirEntry.path(), localRefs).string();
-            fs::path remoteRefPath = fs::path(remoteRefs) / relPath;
-            if (!fs::exists(remoteRefPath.parent_path())) {
-                fs::create_directories(remoteRefPath.parent_path());
-            }
-            fs::copy_file(dirEntry.path(), remoteRefPath, fs::copy_options::overwrite_existing);
-        }
+  }
+  std::string localRefs = gitDir + "/refs/heads";
+  std::string remoteRefs = remoteGitDir + "/refs/heads";
+  for (auto &dirEntry : fs::recursive_directory_iterator(localRefs)) {
+    if (dirEntry.is_regular_file()) {
+      std::string relPath = fs::relative(dirEntry.path(), localRefs).string();
+      fs::path remoteRefPath = fs::path(remoteRefs) / relPath;
+      if (!fs::exists(remoteRefPath.parent_path())) {
+        fs::create_directories(remoteRefPath.parent_path());
+      }
+      fs::copy_file(dirEntry.path(), remoteRefPath,
+                    fs::copy_options::overwrite_existing);
     }
-    return true;
+  }
+  return true;
 }
 
 bool GitRepository::pull(const std::string &remote) {
-    std::string remoteGitDir = remote;
-    // If not a path, try to resolve as remote name
-    if (remote.find('/') == std::string::npos && remote.find('.') == std::string::npos) {
-        GitConfig config(GitConfig::findGitDir());
-        std::string resolved;
-        if (config.getRemote(remote, resolved)) {
-            remoteGitDir = resolved;
-        } else {
-            std::cerr << "Remote '" << remote << "' not found in config.\n";
-            return false;
-        }
+  std::string remoteGitDir = remote;
+  // If not a path, try to resolve as remote name
+  if (remote.find('/') == std::string::npos &&
+      remote.find('.') == std::string::npos) {
+    GitConfig config(GitConfig::findGitDir());
+    std::string resolved;
+    if (config.getRemote(remote, resolved)) {
+      remoteGitDir = resolved;
+    } else {
+      std::cerr << "Remote '" << remote << "' not found in config.\n";
+      return false;
     }
-    namespace fs = std::filesystem;
-    std::string localObjects = gitDir + "/objects";
-    std::string remoteObjects = remoteGitDir + "/objects";
-    for (auto &dirEntry : fs::recursive_directory_iterator(remoteObjects)) {
-        if (dirEntry.is_regular_file()) {
-            std::string relPath = fs::relative(dirEntry.path(), remoteObjects).string();
-            fs::path localObjPath = fs::path(localObjects) / relPath;
-            if (!fs::exists(localObjPath.parent_path())) {
-                fs::create_directories(localObjPath.parent_path());
-            }
-            if (!fs::exists(localObjPath)) {
-                fs::copy_file(dirEntry.path(), localObjPath);
-            }
-        }
+  }
+  namespace fs = std::filesystem;
+  std::string localObjects = gitDir + "/objects";
+  std::string remoteObjects = remoteGitDir + "/objects";
+  for (auto &dirEntry : fs::recursive_directory_iterator(remoteObjects)) {
+    if (dirEntry.is_regular_file()) {
+      std::string relPath =
+          fs::relative(dirEntry.path(), remoteObjects).string();
+      fs::path localObjPath = fs::path(localObjects) / relPath;
+      if (!fs::exists(localObjPath.parent_path())) {
+        fs::create_directories(localObjPath.parent_path());
+      }
+      if (!fs::exists(localObjPath)) {
+        fs::copy_file(dirEntry.path(), localObjPath);
+      }
     }
-    std::string localRefs = gitDir + "/refs/heads";
-    std::string remoteRefs = remoteGitDir + "/refs/heads";
-    for (auto &dirEntry : fs::recursive_directory_iterator(remoteRefs)) {
-        if (dirEntry.is_regular_file()) {
-            std::string relPath = fs::relative(dirEntry.path(), remoteRefs).string();
-            fs::path localRefPath = fs::path(localRefs) / relPath;
-            if (!fs::exists(localRefPath.parent_path())) {
-                fs::create_directories(localRefPath.parent_path());
-            }
-            fs::copy_file(dirEntry.path(), localRefPath, fs::copy_options::overwrite_existing);
-        }
+  }
+  std::string localRefs = gitDir + "/refs/heads";
+  std::string remoteRefs = remoteGitDir + "/refs/heads";
+  for (auto &dirEntry : fs::recursive_directory_iterator(remoteRefs)) {
+    if (dirEntry.is_regular_file()) {
+      std::string relPath = fs::relative(dirEntry.path(), remoteRefs).string();
+      fs::path localRefPath = fs::path(localRefs) / relPath;
+      if (!fs::exists(localRefPath.parent_path())) {
+        fs::create_directories(localRefPath.parent_path());
+      }
+      fs::copy_file(dirEntry.path(), localRefPath,
+                    fs::copy_options::overwrite_existing);
     }
-    // Automatically checkout latest commit on current branch
-    std::string branch = getCurrentBranch();
-    std::string latest = getHashOfBranchHead(branch);
-    if (!latest.empty()) {
-        gotoStateAtPerticularCommit(latest);
-    }
-    return true;
+  }
+  // Automatically checkout latest commit on current branch
+  std::string branch = getCurrentBranch();
+  std::string latest = getHashOfBranchHead(branch);
+  if (!latest.empty()) {
+    gotoStateAtPerticularCommit(latest);
+  }
+  return true;
 }
