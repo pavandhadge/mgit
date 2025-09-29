@@ -1,8 +1,8 @@
 #include "headers/GitMerge.hpp"
 #include "headers/GitIndex.hpp"
 #include "headers/GitObjectStorage.hpp"
-#include "headers/GitRepository.hpp"
 #include "headers/GitObjectTypesClasses.hpp"
+#include "headers/GitRepository.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
@@ -57,13 +57,14 @@ bool GitMerge::validateCommit(const std::string &commitHash) {
       throw MergeException("Commit hash cannot be empty");
     }
     if (commitHash.size() != 40) {
-      throw MergeException("Invalid commit hash length: " + std::to_string(commitHash.size()));
+      throw MergeException("Invalid commit hash length: " +
+                           std::to_string(commitHash.size()));
     }
     if (!std::all_of(commitHash.begin(), commitHash.end(), ::isxdigit)) {
       throw MergeException("Invalid commit hash format");
     }
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "validateCommit failed: " << e.what() << std::endl;
     return false;
   }
@@ -78,7 +79,7 @@ bool GitMerge::validateBranch(const std::string &branchName) {
       throw MergeException("Invalid branch name: " + branchName);
     }
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "validateBranch failed: " << e.what() << std::endl;
     return false;
   }
@@ -93,7 +94,7 @@ bool GitMerge::validatePath(const std::string &path) {
       throw MergeException("Path does not exist: " + path);
     }
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "validatePath failed: " << e.what() << std::endl;
     return false;
   }
@@ -165,9 +166,9 @@ std::string GitMerge::mergeFileContents(const std::string &baseContent,
 }
 
 bool GitMerge::mergeTrees(const std::string &currentTree,
-                   const std::string &targetTree,
-                   const std::string &ancestorTree,
-                   std::string &mergedTreeHash) {
+                          const std::string &targetTree,
+                          const std::string &ancestorTree,
+                          std::string &mergedTreeHash) {
   try {
     // Get tree objects
     TreeObject tree(gitDir);
@@ -177,14 +178,14 @@ bool GitMerge::mergeTrees(const std::string &currentTree,
 
     // Convert to map for easier processing
     std::map<std::string, std::string> currentMap, targetMap, ancestorMap;
-    for (const auto& entry : currentEntries) {
-        currentMap[entry.filename] = entry.hash;
+    for (const auto &entry : currentEntries) {
+      currentMap[entry.filename] = entry.hash;
     }
-    for (const auto& entry : targetEntries) {
-        targetMap[entry.filename] = entry.hash;
+    for (const auto &entry : targetEntries) {
+      targetMap[entry.filename] = entry.hash;
     }
-    for (const auto& entry : ancestorEntries) {
-        ancestorMap[entry.filename] = entry.hash;
+    for (const auto &entry : ancestorEntries) {
+      ancestorMap[entry.filename] = entry.hash;
     }
 
     // Create new tree
@@ -238,7 +239,8 @@ bool GitMerge::threeWayMerge(const std::string &currentCommit,
 
     // Merge trees
     std::string mergedTree;
-    if (!mergeTrees(currentTreeCommit.tree, targetTreeCommit.tree, ancestorTreeCommit.tree, mergedTree)) {
+    if (!mergeTrees(currentTreeCommit.tree, targetTreeCommit.tree,
+                    ancestorTreeCommit.tree, mergedTree)) {
       throw std::runtime_error("Failed to merge trees");
     }
 
@@ -272,22 +274,23 @@ bool GitMerge::checkForConflicts(const std::string &currentBranch,
   }
 
   // Get tree objects from commits
-  std::string currentTreeHash =
-      storage->readObject(currentHead).substr(5, 40);
+  CommitObject commitObj(gitDir);
+  CommitData currentCommitData = commitObj.readObject(currentHead);
+  std::string currentTreeHash = currentCommitData.tree;
   validateTreeHash(currentTreeHash);
 
-  std::string targetTreeHash =
-      storage->readObject(targetHead).substr(5, 40);
+  CommitData targetCommitData = commitObj.readObject(targetHead);
+  std::string targetTreeHash = targetCommitData.tree;
   validateTreeHash(targetTreeHash);
 
   // Find common ancestor (for three-way merge)
   // TODO: Implement findCommonAncestor method
-  std::string commonAncestor = ""; // repo.findCommonAncestor(currentHead, targetHead);
+  std::string commonAncestor =
+      ""; // repo.findCommonAncestor(currentHead, targetHead);
   std::string ancestorTreeHash =
       commonAncestor.empty()
           ? ""
-          : storage->readObject(commonAncestor)
-                .substr(5, 40);
+          : storage->readObject(commonAncestor).substr(5, 40);
 
   if (!ancestorTreeHash.empty()) {
     validateTreeHash(ancestorTreeHash);
@@ -315,7 +318,8 @@ bool GitMerge::validateTreeHash(const std::string &treeHash) {
       throw MergeException("Tree hash cannot be empty");
     }
     if (treeHash.size() != 40) {
-      throw MergeException("Invalid tree hash length: " + std::to_string(treeHash.size()));
+      throw MergeException("Invalid tree hash length: " +
+                           std::to_string(treeHash.size()));
     }
     if (!std::all_of(treeHash.begin(), treeHash.end(), ::isxdigit)) {
       throw MergeException("Invalid tree hash format");
@@ -324,7 +328,7 @@ bool GitMerge::validateTreeHash(const std::string &treeHash) {
       throw MergeException("Tree object not found: " + treeHash);
     }
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "validateTreeHash failed: " << e.what() << std::endl;
     return false;
   }
@@ -336,7 +340,8 @@ bool GitMerge::validateBlobHash(const std::string &blobHash) {
       throw MergeException("Blob hash cannot be empty");
     }
     if (blobHash.size() != 40) {
-      throw MergeException("Invalid blob hash length: " + std::to_string(blobHash.size()));
+      throw MergeException("Invalid blob hash length: " +
+                           std::to_string(blobHash.size()));
     }
     if (!std::all_of(blobHash.begin(), blobHash.end(), ::isxdigit)) {
       throw MergeException("Invalid blob hash format");
@@ -346,7 +351,7 @@ bool GitMerge::validateBlobHash(const std::string &blobHash) {
       throw MergeException("Blob object not found: " + blobHash);
     }
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "validateBlobHash failed: " << e.what() << std::endl;
     return false;
   }
@@ -442,41 +447,45 @@ bool GitMerge::compareBlobs(const std::string &blob1,
   return content1 == content2;
 }
 
-bool GitMerge::findConflictsInTree(const std::string &tree1, const std::string &tree2) {
+bool GitMerge::findConflictsInTree(const std::string &tree1,
+                                   const std::string &tree2) {
   try {
     // TODO: Implement tree conflict detection
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "findConflictsInTree failed: " << e.what() << std::endl;
     return false;
   }
 }
 
-bool GitMerge::detectFileRenames(const std::string &tree1, const std::string &tree2) {
+bool GitMerge::detectFileRenames(const std::string &tree1,
+                                 const std::string &tree2) {
   try {
     // TODO: Implement file rename detection
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "detectFileRenames failed: " << e.what() << std::endl;
     return false;
   }
 }
 
-bool GitMerge::detectDirectoryConflicts(const std::string &tree1, const std::string &tree2) {
+bool GitMerge::detectDirectoryConflicts(const std::string &tree1,
+                                        const std::string &tree2) {
   try {
     // TODO: Implement directory conflict detection
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "detectDirectoryConflicts failed: " << e.what() << std::endl;
     return false;
   }
 }
 
-bool GitMerge::compareTreeEntries(const std::string&, const std::string&, bool) {
+bool GitMerge::compareTreeEntries(const std::string &, const std::string &,
+                                  bool) {
   try {
     // TODO: Implement this function
     return true;
-  } catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     std::cerr << "compareTreeEntries failed: " << e.what() << std::endl;
     return false;
   }
