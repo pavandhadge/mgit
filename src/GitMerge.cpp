@@ -301,7 +301,7 @@ bool GitMerge::checkForConflicts(const std::string &currentBranch,
   conflictDetails.clear();
 
   try {
-    compareTreeEntries(currentTreeHash, targetTreeHash, false);
+    compareTrees(currentTreeHash, targetTreeHash);
     detectFileRenames(currentTreeHash, targetTreeHash);
     detectDirectoryConflicts(currentTreeHash, targetTreeHash);
   } catch (const std::exception &e) {
