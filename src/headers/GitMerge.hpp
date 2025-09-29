@@ -47,10 +47,8 @@ public:
   bool threeWayMerge(const std::string &currentCommit,
                      const std::string &targetCommit,
                      const std::string &commonAncestor);
-  bool mergeTrees(const std::string &currentTree,
-                 const std::string &targetTree,
-                 const std::string &ancestorTree,
-                 std::string &mergedTreeHash);
+  bool mergeTrees(const std::string &currentTree, const std::string &targetTree,
+                  const std::string &ancestorTree, std::string &mergedTreeHash);
 
   // Error handling
   class MergeException : public std::runtime_error {
@@ -76,15 +74,11 @@ private:
   bool detectDirectoryConflicts(const std::string &tree1,
                                 const std::string &tree2);
 
-  // Three-way merge helpers
-  std::string findCommonAncestor(const std::string &currentCommit,
-                                 const std::string &targetCommit);
+  // Tree comparison helpers
   std::string getBlobContent(const std::string &hash);
   std::string mergeFileContents(const std::string &baseContent,
                                 const std::string &ourContent,
                                 const std::string &theirContent);
-
-  // Tree comparison helpers
   bool compareTreeEntries(const std::string &tree1, const std::string &tree2,
                           bool recursive = true);
 

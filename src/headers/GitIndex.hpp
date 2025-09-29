@@ -59,4 +59,5 @@ public:
   void addConflictMarker(const std::string &path, const ConflictMarker &marker);
   std::optional<ConflictMarker>
   getConflictMarker(const std::string &path) const;
+  void resetFromTree(const std::string &treeHash);
 };

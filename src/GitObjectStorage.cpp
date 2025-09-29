@@ -170,6 +170,9 @@ bool GitObjectStorage::validateObjectIntegrity(const std::string &hash) {
 
 std::string GitObjectStorage::readObject(const std::string &hash) {
   try {
+    if (hash.empty()) {
+      return "";
+    }
     std::string path =
         gitDir + "/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
     if (!std::filesystem::exists(path)) {

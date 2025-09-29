@@ -25,7 +25,7 @@ public:
                                 const std::string &author,
                                 const std::string &currentCommit,
                                 const std::string &targetCommit);
-  bool resolveConflicts(const std::string &targetBranch);
+  bool resolveConflicts();
 
 public:
   bool reportStatus(bool shortFormat = false, bool showUntracked = true);
@@ -60,6 +60,8 @@ public:
   bool createCommit(const std::string &message, const std::string &author);
   std::unordered_set<std::string>
   logBranchCommitHistory(const std::string &branchName);
+  std::string findCommonAncestor(const std::string &commitA,
+                                 const std::string &commitB);
   bool gotoStateAtPerticularCommit(const std::string &hash);
   bool exportHeadAsZip(const std::string &branchName,
                        const std::string &outputZipPath);

@@ -422,6 +422,33 @@ StatusResult IndexManager::computeStatus(const std::string &headTreeHash) {
       }
     }
   }
-
   return result;
+}
+
+void IndexManager::resetFromTree(const std::string &treeHash) {
+  entries.clear();
+  pathToIndex.clear();
+  conflictMarkers.clear();
+
+  if (treeHash.empty()) {
+    writeIndex(); // Write an empty index
+    return;
+  }
+
+  TreeObject tree(gitDir);
+  std::map<std::string, std::string> files;
+  tree.getAllFiles(treeHash, files);
+
+  for (const auto &[path, hash] : files) {
+    IndexEntry entry;
+    entry.mode = "100644"; // Assuming file, which is what getAllFiles returns
+    entry.path = path;
+    entry.hash = hash;
+    entry.base_hash = std::string(40, '0');
+    entry.their_hash = std::string(40, '0');
+    entry.conflict_state = ConflictState::NONE;
+    entry.conflict_marker = "";
+    addOrUpdateEntry(entry);
+  }
+  writeIndex();
 }

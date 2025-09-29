@@ -308,16 +308,20 @@ bool handleCheckoutBranch(GitRepository &repo, const std::string &branchName,
 // ==================== MERGE OPERATIONS ====================
 bool handleMergeCommand(GitRepository &repo, const std::string &targetBranch) {
   if (repo.mergeBranch(targetBranch)) {
-    std::cout << "Successfully merged branch: " << targetBranch << "\n";
+    std::cout << "Successfully merged branch: " << targetBranch << std::endl;
     return true;
   } else {
-    std::cerr << "Merge failed or conflicts detected.\n";
+    std::cerr << "error: Merge failed due to conflicting files." << std::endl;
+    std::cerr << "Resolve the conflicts manually and then run 'mgit merge "
+                 "--continue' to proceed."
+              << std::endl;
+    std::cerr << "To abort the merge, run 'mgit merge --abort'." << std::endl;
     return false;
   }
 }
 
 bool handleMergeContinue(GitRepository &repo) {
-  if (repo.resolveConflicts(repo.getCurrentBranch())) {
+  if (repo.resolveConflicts()) {
     std::cout << "Merge completed successfully.\n";
     return true;
   } else {
@@ -722,26 +726,36 @@ bool setupCheckoutCommand(CLI::App &app, GitRepository &repo) {
 }
 
 bool setupMergeCommand(CLI::App &app, GitRepository &repo) {
-  auto targetBranch = std::make_shared<std::string>();
   auto cmd = app.add_subcommand(
       "merge", "Join two or more development histories together");
-  cmd->add_option("branch", *targetBranch, "Branch name to merge")->required();
-  cmd->callback([&repo, targetBranch]() {
+
+  auto targetBranch = std::make_shared<std::string>("");
+  cmd->add_option("branch", *targetBranch,
+                  "Branch to merge into the current branch");
+
+  auto continueMerge = std::make_shared<bool>(false);
+  cmd->add_flag("--continue", *continueMerge,
+                "Continue a merge that was stopped due to conflicts");
+
+  auto abortMerge = std::make_shared<bool>(false);
+  cmd->add_flag("--abort", *abortMerge, "Abort the current merge process");
+
+  cmd->callback([&repo, targetBranch, continueMerge, abortMerge]() {
+    if (*continueMerge) {
+      return handleMergeContinue(repo);
+    }
+    if (*abortMerge) {
+      return handleMergeAbort(repo);
+    }
+    if (targetBranch->empty()) {
+      std::cerr << "error: A branch name is required to start a merge."
+                << std::endl;
+      std::cerr << "Usage: mgit merge <branch>" << std::endl;
+      return false;
+    }
     return handleMergeCommand(repo, *targetBranch);
   });
-  return true;
-}
 
-bool setupMergeContinueCommand(CLI::App &app, GitRepository &repo) {
-  auto cmd = app.add_subcommand(
-      "merge-continue", "Complete a merge after conflicts are resolved");
-  cmd->callback([&repo]() { return handleMergeContinue(repo); });
-  return true;
-}
-
-bool setupMergeAbortCommand(CLI::App &app, GitRepository &repo) {
-  auto cmd = app.add_subcommand("merge-abort", "Abort a merge in progress");
-  cmd->callback([&repo]() { return handleMergeAbort(repo); });
   return true;
 }
 
@@ -909,8 +923,7 @@ bool setupAllCommands(CLI::App &app, GitRepository *repoPtr) {
   setupSwitchCommand(app, *repoPtr);
   setupCheckoutCommand(app, *repoPtr);
   setupMergeCommand(app, *repoPtr);
-  setupMergeContinueCommand(app, *repoPtr);
-  setupMergeAbortCommand(app, *repoPtr);
+
   setupMergeStatusCommand(app, *repoPtr);
   setupResolveConflictCommand(app, *repoPtr);
   setupActivityLogCommand(app, *repoPtr);

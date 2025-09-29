@@ -111,6 +111,10 @@ std::vector<TreeEntry> TreeObject::readObject(const std::string &hash) {
   std::vector<TreeEntry> entries;
   std::string decompressed = GitObjectStorage::readObject(hash);
 
+  if (decompressed.empty()) {
+    return entries;
+  }
+
   size_t nullPos = decompressed.find('\0');
   if (nullPos == std::string::npos) {
     std::cerr << "Error: Invalid tree object (missing null byte).\n";
@@ -232,6 +236,9 @@ std::string CommitObject::writeObject(const CommitData &data) {
 CommitData CommitObject::readObject(const std::string &hash) {
   CommitData data;
   std::string decompressed = GitObjectStorage::readObject(hash);
+  if (decompressed.empty()) {
+    return data;
+  }
   size_t nullPos = decompressed.find('\0');
   if (nullPos == std::string::npos) {
     std::cerr << "Error: Invalid commit object (missing null byte).\n";

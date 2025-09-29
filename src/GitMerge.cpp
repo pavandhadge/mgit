@@ -100,33 +100,6 @@ bool GitMerge::validatePath(const std::string &path) {
   }
 }
 
-std::string GitMerge::findCommonAncestor(const std::string &currentCommit,
-                                         const std::string &targetCommit) {
-  validateCommit(currentCommit);
-  validateCommit(targetCommit);
-
-  std::lock_guard<std::mutex> lock(mergeMutex);
-
-  GitRepository repo(gitDir);
-  std::unordered_set<std::string> currentBranchHistory =
-      repo.logBranchCommitHistory(currentCommit);
-  std::unordered_set<std::string> targetBranchHistory =
-      repo.logBranchCommitHistory(targetCommit);
-
-  std::string commonAncestor = "";
-  for (const auto &commit : currentBranchHistory) {
-    if (targetBranchHistory.find(commit) != targetBranchHistory.end()) {
-      commonAncestor = commit;
-      break;
-    }
-  }
-
-  if (commonAncestor.empty()) {
-    throw MergeException("No common ancestor found between commits");
-  }
-  return commonAncestor;
-}
-
 std::string GitMerge::getBlobContent(const std::string &hash) {
   if (hash.empty())
     return "";
