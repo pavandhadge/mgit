@@ -191,14 +191,21 @@ bool TreeObject::restoreWorkingDirectoryFromTreeHash(const std::string &hash,
                                                      const std::string &path) {
   std::unordered_set<std::string> treePaths;
   restoreTreeContents(hash, path, treePaths);
-  for (auto &entry : std::filesystem::recursive_directory_iterator(path)) {
-    std::string relativePath =
-        std::filesystem::relative(entry.path(), path).string();
-    if (relativePath == ".git")
+  std::vector<std::filesystem::path> to_delete;
+  for (auto it = std::filesystem::recursive_directory_iterator(path);
+       it != std::filesystem::recursive_directory_iterator(); ++it) {
+    if (it->path().filename() == ".git") {
+      it.disable_recursion_pending();
       continue;
-    if (treePaths.find(relativePath) == treePaths.end()) {
-      std::filesystem::remove_all(entry.path());
     }
+    std::string relativePath =
+        std::filesystem::relative(it->path(), path).string();
+    if (treePaths.find(relativePath) == treePaths.end()) {
+      to_delete.push_back(it->path());
+    }
+  }
+  for (const auto &p : to_delete) {
+    std::filesystem::remove_all(p);
   }
   return true;
 }

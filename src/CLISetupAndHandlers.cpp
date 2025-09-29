@@ -44,7 +44,10 @@ bool handleHashObject(GitRepository &repo, const std::string &filepath,
 }
 
 bool handleWriteTree(GitRepository &repo, const std::string &folder) {
-  std::string hash = repo.writeObject(GitObjectType::Tree, folder, true);
+  IndexManager idx(".git");
+  idx.readIndex();
+  TreeObject tree(".git");
+  std::string hash = tree.writeTreeFromIndex(idx.getEntries());
   std::cout << "Tree object written: " << hash << "\n";
   return true;
 }
@@ -102,11 +105,11 @@ bool handleReadObject(GitRepository &repo, const std::string &hash) {
   for (char c : content) {
     if (c == '\0') {
       std::cout << "\\0";
-    } else if (isprint(c)) {
+    } else if (isprint(static_cast<unsigned char>(c))) {
       std::cout << c;
     } else {
-      std::cout << std::hex << std::setw(2) << std::setfill('0')
-                << (int)(unsigned char)c;
+      std::cout << "\\x" << std::hex << std::setw(2) << std::setfill('0')
+                << static_cast<int>(static_cast<unsigned char>(c));
     }
   }
   std::cout << "\n";
@@ -152,7 +155,18 @@ bool handleLsRead(GitRepository &repo, const std::string &hash) {
     std::cerr << "Could not read object.\n";
     return false;
   } else {
-    std::cout << "----- Object Content -----\n" << content << "\n";
+    std::cout << "----- Object Content -----\n";
+    for (char c : content) {
+      if (c == '\0') {
+        std::cout << "\\0";
+      } else if (isprint(static_cast<unsigned char>(c))) {
+        std::cout << c;
+      } else {
+        std::cout << "\\x" << std::hex << std::setw(2) << std::setfill('0')
+                  << static_cast<int>(static_cast<unsigned char>(c));
+      }
+    }
+    std::cout << "\n";
     return true;
   }
 }
@@ -548,14 +562,9 @@ bool setupHashObjectCommand(CLI::App &app, GitRepository &repo) {
 }
 
 bool setupWriteTreeCommand(CLI::App &app, GitRepository &repo) {
-  auto directoryPath = std::make_shared<std::string>();
   auto cmd =
       app.add_subcommand("write-tree", "Create tree object from current index");
-  cmd->add_option("directory", *directoryPath, "Directory to write tree from")
-      ->default_val(".");
-  cmd->callback([&repo, directoryPath]() {
-    return handleWriteTree(repo, *directoryPath);
-  });
+  cmd->callback([&repo]() { return handleWriteTree(repo, "."); });
   return true;
 }
 
@@ -569,7 +578,6 @@ bool setupCommitTreeCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_option("-p,--parent", *parentHash, "Parent commit hash");
   cmd->add_option("-m,--message", *message, "Commit message")->required();
   cmd->add_option("--author", *author, "Commit author");
-  cmd->positionals_at_end();
   cmd->callback([&repo, treeHash, parentHash, message, author]() {
     return handleCommitTree(repo, *treeHash, *parentHash, *message, *author);
   });
@@ -588,7 +596,7 @@ bool setupTagObjectCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_option("name", *tagName, "Tag name")->required();
   cmd->add_option("-m,--message", *message, "Tag message")->required();
   cmd->add_option("--tagger", *tagger, "Tagger information");
-  cmd->positionals_at_end();
+
   cmd->callback([&repo, objectHash, objectType, tagName, message, tagger]() {
     return handleTagObject(repo, *objectHash, *objectType, *tagName, *message,
                            *tagger);

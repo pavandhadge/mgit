@@ -655,20 +655,17 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
     std::cerr << "Commit is not part of current branch history.\n";
     return false;
   }
-  IndexManager idx(gitDir);
-  auto status = idx.computeStatus("");
-  if (!status.staged_changes.empty() || !status.unstaged_changes.empty() ||
-      !status.untracked_files.empty()) {
-    std::cerr << "Untracked or modified changes exist. Please commit/stash "
-                 "them before reset.\n";
-    return false;
-  }
+
   CommitObject commitObj(gitDir);
   CommitData commit = commitObj.readObject(hash);
+  std::vector<std::filesystem::path> to_delete;
   for (auto &entry : std::filesystem::directory_iterator(".")) {
     if (entry.path().filename() != ".git") {
-      std::filesystem::remove_all(entry);
+      to_delete.push_back(entry.path());
     }
+  }
+  for (const auto &path : to_delete) {
+    std::filesystem::remove_all(path);
   }
   TreeObject treeObj(gitDir);
   treeObj.restoreWorkingDirectoryFromTreeHash(commit.tree, ".");
