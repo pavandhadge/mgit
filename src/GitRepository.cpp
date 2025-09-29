@@ -10,6 +10,7 @@
 #include "headers/ZlibUtils.hpp"
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -153,71 +154,63 @@ void GitRepository::indexHandler(const std::vector<std::string> &paths) {
 bool GitRepository::reportStatus(bool shortFormat, bool showUntracked) {
   try {
     IndexManager idx(gitDir);
-    std::vector<std::pair<std::string, std::string>> changes =
-        idx.computeStatus();
+
+    std::string headCommitHash = getHashOfBranchHead(getCurrentBranch());
+    std::string headTreeHash;
+    if (!headCommitHash.empty()) {
+      CommitObject commitObj(gitDir);
+      CommitData commitData = commitObj.readObject(headCommitHash);
+      headTreeHash = commitData.tree;
+    }
+
+    StatusResult status = idx.computeStatus(headTreeHash);
+
     std::ostringstream out;
     out << "On branch " << getCurrentBranch() << "\n";
 
-    std::string headCommitHash = getHashOfBranchHead(getCurrentBranch());
     if (headCommitHash.empty()) {
       out << "\nNo commits yet\n";
     }
 
-    std::vector<std::string> modified;
-    std::vector<std::string> deleted;
-    std::vector<std::string> untracked;
-
-    for (const auto &change : changes) {
-      if (change.first == "modified:") {
-        modified.push_back(change.second);
-      } else if (change.first == "deleted:") {
-        deleted.push_back(change.second);
-      } else if (change.first == "untracked:") {
-        untracked.push_back(change.second);
-      }
-    }
-
-    // NOTE: This implementation only shows unstaged changes (working directory
-    // vs index) and untracked files. It does not show staged changes (index vs
-    // HEAD).
-
-    if (modified.empty() && deleted.empty() && untracked.empty()) {
+    if (status.staged_changes.empty() && status.unstaged_changes.empty() &&
+        status.untracked_files.empty()) {
       out << "\nnothing to commit, working tree clean\n";
       std::cout << out.str();
       return true;
     }
 
-    if (!modified.empty() || !deleted.empty()) {
+    // Staged changes
+    if (!status.staged_changes.empty()) {
+      out << "\nChanges to be committed:\n";
+      out << "  (use \"mgit restore --staged <file>...\" to unstage)\n";
+      for (const auto &change : status.staged_changes) {
+        out << "\t" << change.first << ":   " << change.second << "\n";
+      }
+      out << "\n";
+    }
+
+    // Unstaged changes
+    if (!status.unstaged_changes.empty()) {
       out << "\nChanges not staged for commit:\n";
       out << "  (use \"mgit add <file>...\" to update what will be "
              "committed)\n";
       out << "  (use \"mgit checkout -- <file>...\" to discard changes in "
              "working directory)\n";
-      for (const auto &path : modified) {
-        out << "\tmodified:   " << path << "\n";
-      }
-      for (const auto &path : deleted) {
-        out << "\tdeleted:    " << path << "\n";
+      for (const auto &change : status.unstaged_changes) {
+        out << "\t" << change.first << ":   " << change.second << "\n";
       }
       out << "\n";
     }
 
-    if (showUntracked && !untracked.empty()) {
+    // Untracked files
+    if (showUntracked && !status.untracked_files.empty()) {
       out << "Untracked files:\n";
       out << "  (use \"mgit add <file>...\" to include in what will be "
              "committed)\n";
-      for (const auto &path : untracked) {
+      for (const auto &path : status.untracked_files) {
         out << "\t" << path << "\n";
       }
       out << "\n";
-    }
-
-    if (!modified.empty() || !deleted.empty()) {
-      out << "no changes added to commit (use \"mgit add\" and/or \"mgit "
-             "commit -a\")\n";
-    } else if (!untracked.empty()) {
-      out << "nothing added to commit but untracked files present (use \"mgit "
-             "add\" to track)\n";
     }
 
     std::cout << out.str();
@@ -596,8 +589,20 @@ bool GitRepository::createCommit(const std::string &message,
         << "fatal: unable to auto-detect email address (user.email not set)\n";
     return false;
   }
+
+  IndexManager idx(gitDir);
+  idx.readIndex();
+
+  TreeObject tree(gitDir);
+  std::string treeHash = tree.writeTreeFromIndex(idx.getEntries());
+
+  if (treeHash.empty()) {
+    std::cerr << "Failed to create tree from index.\n";
+    return false;
+  }
+
   CommitData data;
-  data.tree = writeObject(GitObjectType::Tree, ".", true);
+  data.tree = treeHash;
   std::string parent = getHashOfBranchHead(getCurrentBranch());
   if (!parent.empty()) {
     data.parents.push_back(parent);
@@ -651,8 +656,9 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
     return false;
   }
   IndexManager idx(gitDir);
-  auto status = idx.computeStatus();
-  if (!status.empty()) {
+  auto status = idx.computeStatus("");
+  if (!status.staged_changes.empty() || !status.unstaged_changes.empty() ||
+      !status.untracked_files.empty()) {
     std::cerr << "Untracked or modified changes exist. Please commit/stash "
                  "them before reset.\n";
     return false;

@@ -2,6 +2,7 @@
 #include "headers/GitActivityLogger.hpp"
 #include "headers/GitConfig.hpp"
 #include "headers/GitObjectStorage.hpp"
+#include "headers/GitObjectTypesClasses.hpp"
 #include "headers/GitRepository.hpp"
 #include "headers/ZlibUtils.hpp"
 #include <CLI/CLI.hpp>
@@ -97,7 +98,18 @@ bool handleTagObject(GitRepository &repo, const std::string &targetHash,
 // ==================== INSPECTION COMMANDS ====================
 bool handleReadObject(GitRepository &repo, const std::string &hash) {
   std::string content = repo.readObjectRaw(hash);
-  std::cout << "----- Raw Object -----\n" << content << "\n";
+  std::cout << "----- Raw Object -----\n";
+  for (char c : content) {
+    if (c == '\0') {
+      std::cout << "\\0";
+    } else if (isprint(c)) {
+      std::cout << c;
+    } else {
+      std::cout << std::hex << std::setw(2) << std::setfill('0')
+                << (int)(unsigned char)c;
+    }
+  }
+  std::cout << "\n";
   return true;
 }
 
@@ -853,6 +865,24 @@ bool setupLogCommand(CLI::App &app, GitRepository &repo) {
   return true;
 }
 
+bool handleLsTreeRecursive(GitRepository &repo, const std::string &hash) {
+  std::map<std::string, std::string> files;
+  TreeObject tree(".git");
+  tree.getAllFiles(hash, files);
+  for (const auto &[path, file_hash] : files) {
+    std::cout << file_hash << "\t" << path << std::endl;
+  }
+  return true;
+}
+
+bool setupLsTreeRecursiveCommand(CLI::App &app, GitRepository &repo) {
+  auto hash = std::make_shared<std::string>();
+  auto cmd = app.add_subcommand("ls-tree-r", "recursively list tree contents");
+  cmd->add_option("hash", *hash, "Tree object hash")->required();
+  cmd->callback([&repo, hash]() { return handleLsTreeRecursive(repo, *hash); });
+  return true;
+}
+
 // ==================== MAIN APP SETUP ====================
 bool setupAllCommands(CLI::App &app, GitRepository *repoPtr) {
   setupCLIAppHelp(app);
@@ -882,6 +912,7 @@ bool setupAllCommands(CLI::App &app, GitRepository *repoPtr) {
   setupConfigCommand(app, *repoPtr);
   setupCommitCommand(app, *repoPtr);
   setupLogCommand(app, *repoPtr);
+  setupLsTreeRecursiveCommand(app, *repoPtr);
   return true;
 }
 
