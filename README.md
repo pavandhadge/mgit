@@ -1,129 +1,102 @@
-# 🧠 `mgit` — A Minimal Git Clone with Better Readability
+# mgit - A Simple Git Clone
 
-**`mgit`** is a personal Git clone written in **C++**, built to demystify how Git works internally and to explore new ways of improving its usability and readability for users.
+## Description
 
-This project reimplements Git’s core concepts — blobs, trees, commits, tags, and object storage — using a clean CLI interface and simple architecture. It's built as a learning tool **and** as a possible base for more human-readable version control.
+`mgit` is a simple, lightweight clone of the popular version control system, Git. It is written in C++ and aims to replicate the core functionalities of Git, such as initializing repositories, adding and committing files, creating branches, and merging changes. This project is intended for educational purposes, to understand the inner workings of a distributed version control system.
 
----
+## Features
 
-## 🚀 Features
+*   **Repository Initialization:** Create a new `mgit` repository from scratch.
+*   **File Management:** Add files to the staging area and commit them to the repository.
+*   **Branching and Merging:** Create, switch, and delete branches. Merge branches with conflict resolution.
+*   **Conflict Resolution:** When a merge conflict occurs, `mgit` provides clear instructions on how to resolve it. You can either manually resolve the conflicts and continue the merge or abort the merge altogether.
+*   **Status:** View the status of your working directory and staging area.
+*   **Object Model:** `mgit` uses a Git-like object model with blobs, trees, and commits.
 
-* ✅ Git-style object storage with `.git/objects`
-* ✅ SHA-1 hashing of file data (`mgit hash-object`)
-* ✅ Tree and directory snapshotting (`mgit write-tree`)
-* ✅ Commit creation with metadata (`mgit commit-tree` and `mgit commit`)
-* ✅ Annotated tagging (`mgit tag-object`)
-* ✅ Raw and pretty object reading (`mgit cat-file`, `mgit ls-tree`, `mgit read-object`, `mgit ls-read`)
-* ✅ Staging/index support (`mgit add`)
-* ✅ Status reporting (`mgit status`)
-* ✅ Branch management (`mgit branch`, `mgit switch`, `mgit checkout`)
-* ✅ Merge operations and conflict resolution (`mgit merge`, `mgit merge-continue`, `mgit merge-abort`, `mgit resolve-conflict`)
-* ✅ Remote operations (`mgit push`, `mgit pull`, `mgit remote add/remove/list`)
-* ✅ Configuration management (`mgit config`)
-* ✅ Activity logging and analytics (`mgit activity` with subcommands: summary, performance, errors, analysis, timeline, health, workflow, slow, usage, stats, recent, export, raw, errors-raw, performance-raw)
-* ✅ CLI11-based CLI for clear UX
-* 🧑‍💻 Educational source code ideal for learning Git internals
-* 📝 **Comprehensive activity logging and AI-ready analysis**
+## Getting Started
 
----
+### Prerequisites
 
-## ⚠️ Important Note: CLI11 Dependency
+Before you can build `mgit`, you need to have the following software installed on your system:
 
-For the build to work, you must clone the CLI11 library into the `external/` directory:
+*   A C++ compiler that supports C++17 (e.g., GCC, Clang)
+*   CMake (version 3.13 or higher)
+*   OpenSSL
+*   Zlib
+*   SQLite3
+*   vcpkg (for dependency management)
 
-```sh
-git clone https://github.com/CLIUtils/CLI11.git external/CLI11
+### Building `mgit`
+
+`mgit` uses CMake for building. You can choose between a `Debug` and a `Release` build.
+
+**1. Clone the repository:**
+
+```bash
+git clone https://github.com/your-username/mgit.git
+cd mgit
 ```
 
-This is required for the CLI parsing functionality.
+**2. Create a build directory:**
 
----
-
-## 🛠️ Commands
-
-See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for a full list of commands and their options.
-
----
-
-## 📦 Build Instructions
-
-### Dependencies (managed by vcpkg)
-
-* C++17+
-* `zlib` (for compression)
-* `openssl` (for hashing)
-* `sqlite3` (for activity logging)
-* `cli11` (for CLI parsing)
-
-### Build with vcpkg and CMake
-
-1. **Install vcpkg** (if not already):
-   ```sh
-   git clone https://github.com/microsoft/vcpkg.git
-   cd vcpkg
-   ./bootstrap-vcpkg.sh
-   ```
-2. **Install dependencies:**
-   ```sh
-   ./vcpkg/vcpkg install
-   ```
-3. **Build the project:**
-   ```sh
-   ./mgit.sh
-   ```
-   This script will configure and build your project using vcpkg, then run your program.
-
----
-
-## 📁 Project Structure
-
-```
-mgit/
-├── src/
-│   ├── main.cpp
-│   ├── GitRepository.cpp
-│   ├── GitActivityLogger.cpp
-│   └── ...
-├── headers/
-│   └── *.hpp
-├── .git/objects/  ← Created at runtime
-├── vcpkg.json
-├── mgit.sh
-├── external/
-│   └── CLI11/   ← Required for CLI parsing
-└── docs/
-    ├── ARCHITECTURE.md
-    └── API_REFERENCE.md
+```bash
+mkdir build
+cd build
 ```
 
----
+**3. Configure the build (Release or Debug):**
 
-## 📚 Documentation
+*   **For a Release build (optimized):**
 
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md):** High-level design, component interactions, and data flow.
-- **[docs/API_REFERENCE.md](docs/API_REFERENCE.md):** Detailed class, method, and command documentation.
+    ```bash
+    cmake -D CMAKE_BUILD_TYPE=Release ..
+    ```
 
----
+*   **For a Debug build (with debug symbols):**
 
-## 📈 Activity Logging & AI Analysis
+    ```bash
+    cmake -D CMAKE_BUILD_TYPE=Debug ..
+    ```
 
-`mgit` automatically logs all command activity, performance, and errors to `.mgit/activity.log` and related files. See [docs/API_REFERENCE.md](docs/API_REFERENCE.md#activity-logging) for details.
+**4. Build the project:**
 
----
+```bash
+make
+```
 
-## 🧑‍💻 Why I Built This
+The `mgit` executable will be created in the `build` directory.
 
-I made `mgit` to:
+**5. Install `mgit` (optional):**
 
-* Learn Git internals by re-implementing them
-* Understand Git objects, trees, commits, and tags deeply
-* Build a version control interface that's easier for humans to reason about
-* **Explore AI-driven developer tooling and analytics**
+To install the `mgit` executable to `/usr/local/bin`, run:
 
-It's a personal project, educational journey, and exploration of simplicity in tooling.
+```bash
+sudo make install
+```
 
----
+## Command Reference
 
-## License
+Here is a list of the most common `mgit` commands:
 
-**No license is currently set for this project. If you intend to use or contribute, please contact the author or open an issue to discuss licensing.**
+| Command | Description |
+| --- | --- |
+| `mgit init` | Initialize a new `mgit` repository. |
+| `mgit add <file(s)>` | Add file(s) to the staging area. |
+| `mgit commit -m "<message>"` | Commit the staged changes. |
+| `mgit status` | Show the status of the working directory. |
+| `mgit branch` | List all branches. |
+| `mgit branch <name>` | Create a new branch. |
+| `mgit switch <name>` | Switch to a different branch. |
+| `mgit merge <branch>` | Merge a branch into the current branch. |
+| `mgit merge --continue` | Continue a merge after resolving conflicts. |
+| `mgit merge --abort` | Abort a merge in progress. |
+
+## Contributing
+
+Contributions are welcome! If you would like to contribute to `mgit`, please follow these steps:
+
+1.  Fork the repository.
+2.  Create a new branch for your feature or bug fix.
+3.  Make your changes and commit them with descriptive messages.
+4.  Push your changes to your fork.
+5.  Create a pull request to the main repository.
