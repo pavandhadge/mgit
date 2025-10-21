@@ -1,5 +1,5 @@
 # mgit - A Simple Git Clone
-
+![MGit Logo](./docs/mgit.png)
 ## Description
 
 `mgit` is a simple, lightweight clone of the popular version control system, Git. It is written in C++ and aims to replicate the core functionalities of Git, such as initializing repositories, adding and committing files, creating branches, and merging changes. This project is intended for educational purposes, to understand the inner workings of a distributed version control system.
