@@ -60,6 +60,19 @@ xmake
 xmake run mgit -- --help
 ```
 
+**3b. Build Prod Binary (max speed/smaller release):**
+
+```bash
+xmake build mgit_prod
+xmake run prod
+```
+
+**3c. Create Publish Artifact (`dist/*.tar.gz` + sha256):**
+
+```bash
+xmake run publish
+```
+
 **4. Test:**
 
 ```bash
@@ -90,6 +103,34 @@ Here is a list of the most common `mgit` commands:
 | `mgit merge <branch>` | Merge a branch into the current branch. |
 | `mgit merge --continue` | Continue a merge after resolving conflicts. |
 | `mgit merge --abort` | Abort a merge in progress. |
+
+## Activity Analytics Suite
+
+`mgit activity` now exposes a comprehensive analytics + SQLite utility surface:
+
+| Command | Description |
+| --- | --- |
+| `mgit activity summary` | High-level detailed summary of usage and failures. |
+| `mgit activity stats` | SQLite/log storage stats. |
+| `mgit activity recent -l 20` | Show recent command activity rows. |
+| `mgit activity usage` | Command frequency counts. |
+| `mgit activity performance` | Command timing report. |
+| `mgit activity errors` | Error report from recent activity. |
+| `mgit activity error-analysis` | Error pattern clustering view. |
+| `mgit activity analysis` | Usage sequence analysis. |
+| `mgit activity recommendations` | Actionable recommendations. |
+| `mgit activity timeline -d 14` | Timeline report for N days. |
+| `mgit activity slow -t 1500` | Slow commands above threshold ms. |
+| `mgit activity command commit` | Analysis for one command. |
+| `mgit activity health` | Repository health report. |
+| `mgit activity workflow` | Common 3-step workflow patterns. |
+| `mgit activity export-csv -o .mgit/activity.csv` | Export analytics to CSV. |
+| `mgit activity export-log -o .mgit/activity.log.export` | Export raw activity log file. |
+| `mgit activity db-backup -o .mgit/activity.backup.db` | Backup SQLite activity DB. |
+| `mgit activity prune -d 30` | Delete old activity DB records. |
+| `mgit activity raw` | Print raw activity log. |
+| `mgit activity errors-raw` | Print raw error log. |
+| `mgit activity performance-raw` | Print raw performance log. |
 
 ## Contributing
 

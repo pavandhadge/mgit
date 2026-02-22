@@ -60,3 +60,4 @@ xmake.log
 test_evaluation/*
 
 external/CLI11
+dist

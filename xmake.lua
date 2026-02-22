@@ -60,3 +60,24 @@ target("prod")
     on_run(function ()
         cprint("${bright green}Production binary ready:${clear} build/prod/mgit")
     end)
+
+target("publish")
+    set_kind("phony")
+    add_deps("mgit_prod")
+    on_run(function ()
+        local stamp = os.date("%Y%m%d-%H%M%S")
+        local pkgname = "mgit-" .. stamp .. "-linux-x86_64"
+        local distdir = "dist"
+        local pkgdir = distdir .. "/" .. pkgname
+        os.mkdir(pkgdir .. "/bin")
+        os.cp("build/prod/mgit", pkgdir .. "/bin/mgit")
+        if os.isfile("README.md") then
+            os.cp("README.md", pkgdir .. "/README.md")
+        end
+        local archive = distdir .. "/" .. pkgname .. ".tar.gz"
+        os.execv("tar", {"-czf", archive, "-C", distdir, pkgname})
+        local sha = archive .. ".sha256"
+        os.execv("bash", {"-lc", "sha256sum " .. archive .. " > " .. sha})
+        cprint("${bright green}Publish artifact:${clear} " .. archive)
+        cprint("${bright green}Checksum file:${clear} " .. sha)
+    end)

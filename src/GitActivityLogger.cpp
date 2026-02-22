@@ -898,4 +898,154 @@ bool GitActivityLogger::exportToCSV(const std::string& file_path) {
         std::cerr << "Failed to export CSV: " << e.what() << std::endl;
         return false;
     }
-} 
+}
+
+void GitActivityLogger::logUserAction(const std::string& action_type,
+                                      const std::map<std::string, std::string>& context) {
+    std::stringstream entry;
+    entry << getCurrentTimestamp() << "|USER_ACTION|" << action_type << "|" << serializeMap(context);
+    writeToLog(activity_log_path, entry.str());
+}
+
+std::vector<ActivityRecord> GitActivityLogger::getActivityByCommand(const std::string& command, int limit) {
+    std::vector<ActivityRecord> filtered;
+    auto all = getRecentActivity(10000);
+    for (const auto& rec : all) {
+        if (rec.command == command) {
+            filtered.push_back(rec);
+            if (static_cast<int>(filtered.size()) >= limit) {
+                break;
+            }
+        }
+    }
+    return filtered;
+}
+
+std::vector<ActivityRecord> GitActivityLogger::getErrors(int limit) {
+    std::vector<ActivityRecord> filtered;
+    auto all = getRecentActivity(10000);
+    for (const auto& rec : all) {
+        if (rec.exit_code != 0) {
+            filtered.push_back(rec);
+            if (static_cast<int>(filtered.size()) >= limit) {
+                break;
+            }
+        }
+    }
+    return filtered;
+}
+
+std::vector<ActivityRecord> GitActivityLogger::getSlowCommands(double threshold_ms) {
+    std::vector<ActivityRecord> filtered;
+    auto all = getRecentActivity(10000);
+    for (const auto& rec : all) {
+        if (rec.execution_time_ms > threshold_ms) {
+            filtered.push_back(rec);
+        }
+    }
+    std::sort(filtered.begin(), filtered.end(), [](const ActivityRecord& a, const ActivityRecord& b) {
+        return a.execution_time_ms > b.execution_time_ms;
+    });
+    return filtered;
+}
+
+std::vector<std::string> GitActivityLogger::getCommonErrorPatterns() {
+    std::map<std::string, int> freq;
+    for (const auto& rec : getErrors(10000)) {
+        if (!rec.error_message.empty()) {
+            freq[rec.error_message]++;
+        }
+    }
+    std::vector<std::pair<std::string, int>> sorted(freq.begin(), freq.end());
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        return a.second > b.second;
+    });
+    std::vector<std::string> out;
+    for (const auto& p : sorted) {
+        out.push_back(p.first + " (" + std::to_string(p.second) + ")");
+    }
+    return out;
+}
+
+std::map<std::string, double> GitActivityLogger::getAverageExecutionTimes() {
+    std::map<std::string, std::pair<double, int>> accum;
+    for (const auto& rec : getRecentActivity(10000)) {
+        accum[rec.command].first += rec.execution_time_ms;
+        accum[rec.command].second += 1;
+    }
+    std::map<std::string, double> result;
+    for (const auto& [cmd, pair] : accum) {
+        result[cmd] = pair.second > 0 ? pair.first / pair.second : 0.0;
+    }
+    return result;
+}
+
+std::string GitActivityLogger::generateRecommendations() {
+    std::stringstream ss;
+    ss << "=== RECOMMENDATIONS ===\n\n";
+    auto summary = generateLogSummary();
+
+    if (summary.failed_commands > 0) {
+        ss << "- Investigate recurring failures using: mgit activity errors\n";
+    }
+    if (summary.longest_execution_time > 1000.0) {
+        ss << "- Profile slow workflows using: mgit activity slow --threshold 1000\n";
+    }
+    if (summary.total_commands < 10) {
+        ss << "- Collect more activity for stronger analytics insights.\n";
+    }
+    if (summary.failed_commands == 0 && summary.longest_execution_time <= 1000.0) {
+        ss << "- No immediate performance or reliability issues detected.\n";
+    }
+    return ss.str();
+}
+
+bool GitActivityLogger::exportActivityLog(const std::string& file_path) {
+    try {
+        std::ofstream out(file_path);
+        if (!out.is_open()) {
+            return false;
+        }
+        out << getLogFileContents("activity");
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool GitActivityLogger::clearOldLogs(int days_to_keep) {
+    try {
+        if (days_to_keep < 0) {
+            return false;
+        }
+        if (db) {
+            std::string sql =
+                "DELETE FROM activity_log "
+                "WHERE datetime(substr(timestamp,1,19)) < datetime('now', ?);";
+            sqlite3_stmt* stmt = nullptr;
+            if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+                std::string modifier = "-" + std::to_string(days_to_keep) + " days";
+                sqlite3_bind_text(stmt, 1, modifier.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+            }
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool GitActivityLogger::backupDatabase(const std::string& backup_path) {
+    try {
+        std::string db_path = log_dir + "/activity.db";
+        if (!std::filesystem::exists(db_path)) {
+            return false;
+        }
+        std::filesystem::create_directories(std::filesystem::path(backup_path).parent_path());
+        std::filesystem::copy_file(db_path, backup_path, std::filesystem::copy_options::overwrite_existing);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}

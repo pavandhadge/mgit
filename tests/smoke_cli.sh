@@ -83,6 +83,26 @@ run_expect "pull" 0 "$BIN" pull origin
 run_expect "remote-remove" 0 "$BIN" remote remove origin
 
 run_expect "activity-summary" 0 "$BIN" activity summary
+run_expect "activity-stats" 0 "$BIN" activity stats
+run_expect "activity-recent" 0 "$BIN" activity recent -l 5
+run_expect "activity-usage" 0 "$BIN" activity usage
+run_expect "activity-performance" 0 "$BIN" activity performance
+run_expect "activity-errors" 0 "$BIN" activity errors
+run_expect "activity-error-analysis" 0 "$BIN" activity error-analysis
+run_expect "activity-analysis" 0 "$BIN" activity analysis
+run_expect "activity-recommendations" 0 "$BIN" activity recommendations
+run_expect "activity-timeline" 0 "$BIN" activity timeline -d 3
+run_expect "activity-slow" 0 "$BIN" activity slow -t 1
+run_expect "activity-command" 0 "$BIN" activity command status
+run_expect "activity-health" 0 "$BIN" activity health
+run_expect "activity-workflow" 0 "$BIN" activity workflow
+run_expect "activity-export-csv" 0 "$BIN" activity export-csv -o .mgit/smoke_activity.csv
+run_expect "activity-export-log" 0 "$BIN" activity export-log -o .mgit/smoke_activity.log
+run_expect "activity-db-backup" 0 "$BIN" activity db-backup -o .mgit/smoke_activity.db.bak
+run_expect "activity-prune" 0 "$BIN" activity prune -d 30
+run_expect "activity-raw" 0 "$BIN" activity raw
+run_expect "activity-errors-raw" 0 "$BIN" activity errors-raw
+run_expect "activity-performance-raw" 0 "$BIN" activity performance-raw
 run_expect "resolve-conflict-noop" nonzero "$BIN" resolve-conflict a.txt deadbeef
 run_expect "log-placeholder" nonzero "$BIN" log
 

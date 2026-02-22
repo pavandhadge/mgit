@@ -793,18 +793,177 @@ bool setupResolveConflictCommand(CLI::App &app, GitRepository &repo) {
 }
 
 bool setupActivityLogCommand(CLI::App &app, GitRepository &repo) {
-  auto command = std::make_shared<std::string>();
-  auto limit = std::make_shared<int>(10);
-  auto cmd =
-      app.add_subcommand("activity", "View activity logs and statistics");
-  cmd->add_option("command", *command,
-                  "Activity command (summary, stats, recent, usage)")
-      ->required();
-  cmd->add_option("-l,--limit", *limit, "Limit for recent commands")
-      ->default_val(10);
-  cmd->callback([&repo, command, limit]() {
-    return handleActivityLog(repo, *command, *limit);
+  auto activity =
+      app.add_subcommand("activity", "Activity analytics and SQLite-backed reporting");
+
+  auto summary = activity->add_subcommand("summary", "Detailed activity summary");
+  summary->callback([]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateDetailedSummary() << std::endl;
   });
+
+  auto stats = activity->add_subcommand("stats", "Database/log file stats");
+  stats->callback([]() {
+    GitActivityLogger logger;
+    std::cout << logger.getDatabaseStats() << std::endl;
+  });
+
+  auto recent = activity->add_subcommand("recent", "Recent activity records");
+  auto recentLimit = std::make_shared<int>(10);
+  recent->add_option("-l,--limit", *recentLimit, "Number of rows")->default_val(10);
+  recent->callback([recentLimit]() {
+    GitActivityLogger logger;
+    auto activities = logger.getRecentActivity(*recentLimit);
+    std::cout << "Recent Activity (last " << *recentLimit << " commands):\n";
+    std::cout << "==========================================\n";
+    for (const auto &activity : activities) {
+      std::cout << "[" << activity.timestamp << "] " << activity.command;
+      if (!activity.arguments.empty()) std::cout << " " << activity.arguments;
+      std::cout << " (exit: " << activity.exit_code << ")";
+      if (activity.execution_time_ms > 0) {
+        std::cout << " [" << std::fixed << std::setprecision(2)
+                  << activity.execution_time_ms << "ms]";
+      }
+      std::cout << "\n";
+      if (!activity.error_message.empty()) {
+        std::cout << "  Error: " << activity.error_message << "\n";
+      }
+    }
+  });
+
+  auto usage = activity->add_subcommand("usage", "Command usage frequencies");
+  usage->callback([]() {
+    GitActivityLogger logger;
+    auto stats = logger.getCommandUsageStats();
+    std::cout << "Command Usage Statistics:\n";
+    std::cout << "========================\n";
+    for (const auto &stat : stats) {
+      std::cout << std::setw(15) << stat.first << ": " << stat.second << " times\n";
+    }
+  });
+
+  activity->add_subcommand("performance", "Performance report")
+      ->callback([]() {
+        GitActivityLogger logger;
+        std::cout << logger.generatePerformanceReport() << std::endl;
+      });
+  activity->add_subcommand("errors", "Error report")->callback([]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateErrorReport() << std::endl;
+  });
+  activity->add_subcommand("error-analysis", "Error pattern analysis")
+      ->callback([]() {
+        GitActivityLogger logger;
+        std::cout << logger.generateErrorAnalysis() << std::endl;
+      });
+  activity->add_subcommand("analysis", "Usage pattern analysis")->callback([]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateUsagePatterns() << std::endl;
+  });
+  activity->add_subcommand("recommendations", "Actionable recommendations")
+      ->callback([]() {
+        GitActivityLogger logger;
+        std::cout << logger.generateRecommendations() << std::endl;
+      });
+
+  auto timeline = activity->add_subcommand("timeline", "Timeline report");
+  auto days = std::make_shared<int>(7);
+  timeline->add_option("-d,--days", *days, "Days to include")->default_val(7);
+  timeline->callback([days]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateTimelineReport(*days) << std::endl;
+  });
+
+  auto slow = activity->add_subcommand("slow", "Slow command report");
+  auto threshold = std::make_shared<double>(1000.0);
+  slow->add_option("-t,--threshold", *threshold, "Threshold in ms")->default_val(1000.0);
+  slow->callback([threshold]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateSlowCommandsReport(*threshold) << std::endl;
+  });
+
+  auto cmdAnalysis = activity->add_subcommand("command", "Analyze a specific command");
+  auto cmdName = std::make_shared<std::string>();
+  cmdAnalysis->add_option("name", *cmdName, "Command name")->required();
+  cmdAnalysis->callback([cmdName]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateCommandAnalysis(*cmdName) << std::endl;
+  });
+
+  activity->add_subcommand("health", "Repository health report")->callback([]() {
+    GitActivityLogger logger;
+    std::cout << logger.generateRepositoryHealthReport() << std::endl;
+  });
+  activity->add_subcommand("workflow", "Workflow sequence analysis")
+      ->callback([]() {
+        GitActivityLogger logger;
+        std::cout << logger.generateWorkflowAnalysis() << std::endl;
+      });
+
+  auto exportCsv = activity->add_subcommand("export-csv", "Export recent data to CSV");
+  auto csvPath = std::make_shared<std::string>(".mgit/activity_export.csv");
+  exportCsv->add_option("-o,--out", *csvPath, "CSV output path")
+      ->default_val(".mgit/activity_export.csv");
+  exportCsv->callback([csvPath]() {
+    GitActivityLogger logger;
+    if (!logger.exportToCSV(*csvPath)) {
+      throw CLI::RuntimeError(1);
+    }
+    std::cout << "Activity log exported to: " << *csvPath << std::endl;
+  });
+
+  auto exportLog = activity->add_subcommand("export-log", "Export raw activity log");
+  auto logOut = std::make_shared<std::string>(".mgit/activity.log.export");
+  exportLog->add_option("-o,--out", *logOut, "Log output path")
+      ->default_val(".mgit/activity.log.export");
+  exportLog->callback([logOut]() {
+    GitActivityLogger logger;
+    if (!logger.exportActivityLog(*logOut)) {
+      throw CLI::RuntimeError(1);
+    }
+    std::cout << "Activity log exported to: " << *logOut << std::endl;
+  });
+
+  auto dbBackup = activity->add_subcommand("db-backup", "Backup sqlite activity.db");
+  auto backupPath = std::make_shared<std::string>(".mgit/activity.backup.db");
+  dbBackup->add_option("-o,--out", *backupPath, "Backup DB path")
+      ->default_val(".mgit/activity.backup.db");
+  dbBackup->callback([backupPath]() {
+    GitActivityLogger logger;
+    if (!logger.backupDatabase(*backupPath)) {
+      throw CLI::RuntimeError(1);
+    }
+    std::cout << "Database backup written to: " << *backupPath << std::endl;
+  });
+
+  auto prune = activity->add_subcommand("prune", "Delete logs older than N days");
+  auto keepDays = std::make_shared<int>(30);
+  prune->add_option("-d,--days", *keepDays, "Days to keep")->default_val(30);
+  prune->callback([keepDays]() {
+    GitActivityLogger logger;
+    if (!logger.clearOldLogs(*keepDays)) {
+      throw CLI::RuntimeError(1);
+    }
+    std::cout << "Pruned old log records. Days kept: " << *keepDays << std::endl;
+  });
+
+  activity->add_subcommand("raw", "Print raw activity log")->callback([]() {
+    GitActivityLogger logger;
+    std::cout << "=== RAW ACTIVITY LOG ===\n";
+    std::cout << logger.getLogFileContents("activity") << std::endl;
+  });
+  activity->add_subcommand("errors-raw", "Print raw error log")->callback([]() {
+    GitActivityLogger logger;
+    std::cout << "=== RAW ERROR LOG ===\n";
+    std::cout << logger.getLogFileContents("errors") << std::endl;
+  });
+  activity->add_subcommand("performance-raw", "Print raw performance log")
+      ->callback([]() {
+        GitActivityLogger logger;
+        std::cout << "=== RAW PERFORMANCE LOG ===\n";
+        std::cout << logger.getLogFileContents("performance") << std::endl;
+      });
+
   return true;
 }
 
