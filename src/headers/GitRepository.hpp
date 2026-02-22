@@ -18,6 +18,7 @@ private:
   std::string gitDir;
   std::unique_ptr<GitMerge> merge; // Use smart pointer for better ownership
   std::mutex mergeMutex;           // For thread safety
+  void ensureMergeInitialized();
 
 public:
   // Helper methods

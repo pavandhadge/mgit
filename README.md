@@ -21,14 +21,15 @@ Before you can build `mgit`, you need to have the following software installed o
 
 *   A C++ compiler that supports C++17 (e.g., GCC, Clang)
 *   CMake (version 3.13 or higher)
-*   OpenSSL
 *   Zlib
 *   SQLite3
-*   vcpkg (for dependency management)
+*   xmake
 
 ### Building `mgit`
 
-`mgit` uses CMake for building. You can choose between a `Debug` and a `Release` build.
+`mgit` uses xmake for local development builds.
+CLI11 is vendored in the repository (`external/CLI/CLI.hpp`).
+OpenSSL is not required anymore; SHA-1 is implemented internally.
 
 **1. Clone the repository:**
 
@@ -37,42 +38,41 @@ git clone https://github.com/your-username/mgit.git
 cd mgit
 ```
 
-**2. Create a build directory:**
+**2. Configure + build:**
 
 ```bash
-mkdir build
-cd build
+export XMAKE_GLOBALDIR=$PWD/.xmake-global
+xmake f -m release
+xmake
 ```
 
-**3. Configure the build (Release or Debug):**
-
-*   **For a Release build (optimized):**
-
-    ```bash
-    cmake -D CMAKE_BUILD_TYPE=Release ..
-    ```
-
-*   **For a Debug build (with debug symbols):**
-
-    ```bash
-    cmake -D CMAKE_BUILD_TYPE=Debug ..
-    ```
-
-**4. Build the project:**
+For debug builds:
 
 ```bash
-make
+export XMAKE_GLOBALDIR=$PWD/.xmake-global
+xmake f -m debug
+xmake
 ```
 
-The `mgit` executable will be created in the `build` directory.
-
-**5. Install `mgit` (optional):**
-
-To install the `mgit` executable to `/usr/local/bin`, run:
+**3. Run:**
 
 ```bash
-sudo make install
+xmake run mgit -- --help
 ```
+
+**4. Test:**
+
+```bash
+xmake run test
+```
+
+**5. Compile + test:**
+
+```bash
+xmake run compile-test
+```
+
+Both test commands run in isolated temporary directories under `/tmp` and do not touch this repository's `.git` or `.mgit`.
 
 ## Command Reference
 

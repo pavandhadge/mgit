@@ -19,13 +19,20 @@
 #include <vector>
 
 GitRepository::GitRepository(const std::string &root)
-    : gitDir(root), merge(std::make_unique<GitMerge>(gitDir)) {}
+    : gitDir(root), merge(nullptr) {}
+
+void GitRepository::ensureMergeInitialized() {
+  if (!merge && std::filesystem::exists(gitDir)) {
+    merge = std::make_unique<GitMerge>(gitDir);
+  }
+}
 
 bool GitRepository::init(const std::string &path) {
   try {
     gitDir = path;
     GitInit objInit(gitDir);
     objInit.run();
+    ensureMergeInitialized();
     return true;
   } catch (const std::exception &e) {
     std::cerr << "Init failed: " << e.what() << std::endl;
@@ -224,7 +231,7 @@ bool GitRepository::reportStatus(bool shortFormat, bool showUntracked) {
 
 bool GitRepository::CreateBranch(const std::string &branchName) {
   try {
-    Branch branchObj;
+    Branch branchObj(gitDir);
     return branchObj.createBranch(branchName);
   } catch (const std::exception &e) {
     std::cerr << "CreateBranch failed: " << e.what() << std::endl;
@@ -234,7 +241,7 @@ bool GitRepository::CreateBranch(const std::string &branchName) {
 
 bool GitRepository::listbranches(const std::string &branchName) {
   try {
-    Branch branchObj;
+    Branch branchObj(gitDir);
     if (!branchObj.listBranches()) {
       throw std::runtime_error("Failed to list branches");
     }
@@ -246,7 +253,7 @@ bool GitRepository::listbranches(const std::string &branchName) {
 }
 
 std::string GitRepository::getCurrentBranch() const {
-  Branch branchObj;
+  Branch branchObj(gitDir);
   return branchObj.getCurrentBranch();
 }
 
@@ -257,8 +264,8 @@ bool GitRepository::changeCurrentBranch(const std::string &targetBranch,
       if (!CreateBranch(targetBranch))
         return false;
     }
-    Branch branchObj;
-    gitHead head;
+    Branch branchObj(gitDir);
+    gitHead head(gitDir);
     head.writeHeadToHeadOfNewBranch(targetBranch);
     // After switching, restore working directory to latest commit on branch
     std::string latest = getHashOfBranchHead(targetBranch);
@@ -273,18 +280,18 @@ bool GitRepository::changeCurrentBranch(const std::string &targetBranch,
 }
 
 std::string GitRepository::getHashOfBranchHead(const std::string &branchName) {
-  Branch branchObj;
+  Branch branchObj(gitDir);
   return branchObj.getBranchHash(branchName);
 }
 
 bool GitRepository::deleteBranch(const std::string &branchName) {
-  Branch branchObj;
+  Branch branchObj(gitDir);
   return branchObj.deleteBranch(branchName);
 }
 
 bool GitRepository::renameBranch(const std::string &oldName,
                                  const std::string &newName) {
-  Branch branchObj;
+  Branch branchObj(gitDir);
   return branchObj.renameBranch(oldName, newName);
 }
 
@@ -370,6 +377,7 @@ bool GitRepository::isFullyMerged(const std::string &branchName) {
 
 bool GitRepository::reportMergeConflicts(const std::string &targetBranch) {
   try {
+    ensureMergeInitialized();
     if (!merge) {
       std::cout << "No merge in progress or no conflicts to report.\n";
       return false;
@@ -421,7 +429,7 @@ bool GitRepository::mergeBranch(const std::string &targetBranch) {
   if (baseCommitHash == currentHead) {
     // Fast-forward merge
     gotoStateAtPerticularCommit(targetHead);
-    gitHead head;
+    gitHead head(gitDir);
     head.updateHead(targetHead);
     std::cout << "Fast-forward merge." << std::endl;
     return true;
@@ -728,7 +736,7 @@ bool GitRepository::createCommit(const std::string &message,
   data.message = message;
   std::string hash = writeObject(GitObjectType::Commit, data);
   std::cout << "Commit object written: " << hash << "\n";
-  gitHead head;
+  gitHead head(gitDir);
   head.updateHead(hash);
   return true;
 }
@@ -774,7 +782,7 @@ std::string GitRepository::findCommonAncestor(const std::string &commitA,
 }
 
 bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
-  std::string path = ".git/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
+  std::string path = gitDir + "/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
   if (!std::filesystem::exists(path)) {
     std::cerr
         << "No such commit exists. Ensure it is part of the current branch.\n";
@@ -801,7 +809,7 @@ bool GitRepository::gotoStateAtPerticularCommit(const std::string &hash) {
   }
   TreeObject treeObj(gitDir);
   treeObj.restoreWorkingDirectoryFromTreeHash(commit.tree, ".");
-  gitHead head;
+  gitHead head(gitDir);
   head.updateHead(hash);
   std::cout << "Repository successfully reset to commit: " << hash << "\n";
   return true;

@@ -8,9 +8,9 @@
 #include <string>
 // #include <filesystem>
 
-Branch::Branch(){
-
-}
+Branch::Branch(const std::string &gitDirPath)
+    : gitDir(gitDirPath + "/"), headsDir(gitDirPath + "/refs/heads/"),
+      headFile(gitDirPath + "/HEAD") {}
 
 bool Branch::createBranch(const std::string& branchName){
     try {
@@ -47,7 +47,7 @@ bool Branch::createBranch(const std::string& branchName){
 
 bool Branch::checkout(const std::string& branchName){
     try {
-        gitHead head;
+        gitHead head(gitDir.substr(0, gitDir.size() - 1));
         if (!head.writeHeadToHeadOfNewBranch(branchName)) {
             throw BranchException("Failed to update HEAD for branch: " + branchName);
         }
@@ -59,7 +59,7 @@ bool Branch::checkout(const std::string& branchName){
 }
 
 std::string Branch::getCurrentBranch()const {
-    gitHead head ;
+    gitHead head(gitDir.substr(0, gitDir.size() - 1));
     return head.getBranch() ;
 }
 
@@ -139,12 +139,12 @@ bool Branch::renameBranch(const std::string& oldName, const std::string& newName
         // Update HEAD if renaming current branch
         std::string currentBranch = getCurrentBranch();
         if (currentBranch == oldName) {
-            std::ofstream headFile(headsDir + "/HEAD");
-            if (!headFile.is_open()) {
+            std::ofstream headRefFile(headFile);
+            if (!headRefFile.is_open()) {
                 throw BranchException("Failed to update HEAD after rename");
             }
-            headFile << "ref: refs/heads/" << newName << std::endl;
-            headFile.close();
+            headRefFile << "ref: refs/heads/" << newName << std::endl;
+            headRefFile.close();
         }
         
         return true;
@@ -155,7 +155,7 @@ bool Branch::renameBranch(const std::string& oldName, const std::string& newName
 }
 
 std::string Branch::getCurrentBranchHash() const{
-    gitHead head ;
+    gitHead head(gitDir.substr(0, gitDir.size() - 1));
     return head.getBranchHeadHash() ;
     // return hash ;
 }
@@ -195,4 +195,21 @@ bool Branch::updateBranchHead(const std::string& branchName, const std::string& 
         std::cerr << "updateBranchHead failed: " << e.what() << std::endl;
         return false;
     }
+}
+
+std::vector<std::string> Branch::getAllBranches() const {
+    std::vector<std::string> branches;
+    try {
+        if (!std::filesystem::exists(headsDir)) {
+            return branches;
+        }
+        for (const auto &entry : std::filesystem::directory_iterator(headsDir)) {
+            if (entry.is_regular_file()) {
+                branches.push_back(entry.path().filename().string());
+            }
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "getAllBranches failed: " << e.what() << std::endl;
+    }
+    return branches;
 }

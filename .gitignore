@@ -52,8 +52,9 @@ Mkfile.old
 dkms.conf
 
 build
-vcpkg
-vcpkg_installed
+.xmake
+.xmake-global
+xmake.log
 
 
 test_evaluation/*

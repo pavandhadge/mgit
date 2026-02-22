@@ -4,9 +4,11 @@
 #include <iostream>
 #include <string>
 
+gitHead::gitHead(const std::string &gitDir) : gitDir(gitDir) {}
+
 bool gitHead::readHead() {
   try {
-    std::string headPath = ".git/HEAD";
+    std::string headPath = gitDir + "/HEAD";
     if (!std::filesystem::exists(headPath)) {
       std::cerr << "HEAD file does not exist\n";
       return false;
@@ -30,7 +32,7 @@ bool gitHead::readHead() {
     std::string refPath = content.substr(5);                // removes "ref: "
     branch = refPath.substr(refPath.find_last_of('/') + 1); // e.g., "master"
 
-    std::string fullBranchPath = ".git/" + refPath;
+    std::string fullBranchPath = gitDir + "/" + refPath;
     if (!std::filesystem::exists(fullBranchPath)) {
       std::cerr << "Branch ref file does not exist: " << fullBranchPath << "\n";
       return false;
@@ -63,7 +65,7 @@ bool gitHead::updateHead(const std::string &newCommitHash) {
   if (headOk) {
     branchName = branch;
   } else {
-    std::string headPath = ".git/HEAD";
+    std::string headPath = gitDir + "/HEAD";
     if (std::filesystem::exists(headPath)) {
       std::ifstream head(headPath);
       std::string content;
@@ -83,7 +85,7 @@ bool gitHead::updateHead(const std::string &newCommitHash) {
     std::cerr << "Cannot determine branch name to update HEAD.\n";
     return false;
   }
-  std::string fullBranchPath = ".git/refs/heads/" + branchName;
+  std::string fullBranchPath = gitDir + "/refs/heads/" + branchName;
   std::ofstream branchFile(fullBranchPath);
   if (!branchFile.is_open()) {
     std::cerr << "Error creating/writing branch file: " << fullBranchPath << "\n";
@@ -98,7 +100,7 @@ bool gitHead::updateHead(const std::string &newCommitHash) {
 
 bool gitHead::writeHeadToHeadOfNewBranch(const std::string &branchName) {
   try {
-    std::string headPath = ".git/HEAD";
+    std::string headPath = gitDir + "/HEAD";
     std::ofstream headFile(headPath, std::ios::trunc);
     if (!headFile.is_open()) {
       std::cerr << "Error writing to HEAD file\n";

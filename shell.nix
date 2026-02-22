@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> {}, withX11 ? false }:
 
 (pkgs.buildFHSUserEnv {
-  name = "vcpkg";
+  name = "mgit-dev";
   targetPkgs = pkgs: (with pkgs; [
       autoconf
       automake

@@ -14,7 +14,7 @@ private:
 class Branch {
 public:
     // Constructor: initialize and load current HEAD info
-    Branch();
+    explicit Branch(const std::string& gitDir = ".git");
 
     // Create a new branch pointing to the current commit
     bool createBranch(const std::string& branchName);

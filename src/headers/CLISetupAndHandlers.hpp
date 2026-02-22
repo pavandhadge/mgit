@@ -51,37 +51,37 @@ bool handleRemoteAdd(GitRepository &repo, const std::string &name,
 bool handleRemoteRemove(GitRepository &repo, const std::string &name);
 bool handleRemoteList(GitRepository &repo);
 
-bool setupAllCommands(CLI::App &app, GitRepository *repo);
+bool setupAllCommands(CLI::App &app, GitRepository &repo);
 
 // Command setup functions
 bool setupCLIAppHelp(CLI::App &app);
-bool setupInitCommand(CLI::App &app, GitRepository *repo);
-bool setupHashObjectCommand(CLI::App &app, GitRepository *repo);
-bool setupWriteTreeCommand(CLI::App &app, GitRepository *repo);
-bool setupCommitTreeCommand(CLI::App &app, GitRepository *repo);
-bool setupTagObjectCommand(CLI::App &app, GitRepository *repo);
-bool setupReadObjectCommand(CLI::App &app, GitRepository *repo);
-bool setupCatFileCommand(CLI::App &app, GitRepository *repo);
-bool setupLsReadCommand(CLI::App &app, GitRepository *repo);
-bool setupLsTreeCommand(CLI::App &app, GitRepository *repo);
-bool setupLsTreeRecursiveCommand(CLI::App &app, GitRepository *repo);
-bool setupAddCommand(CLI::App &app, GitRepository *repo);
-bool setupStatusCommand(CLI::App &app, GitRepository *repo);
-bool setupBranchCommand(CLI::App &app, GitRepository *repo);
-bool setupSwitchCommand(CLI::App &app, GitRepository *repo);
-bool setupCheckoutCommand(CLI::App &app, GitRepository *repo);
-bool setupMergeCommand(CLI::App &app, GitRepository *repo);
-bool setupMergeContinueCommand(CLI::App &app, GitRepository *repo);
-bool setupMergeAbortCommand(CLI::App &app, GitRepository *repo);
-bool setupMergeStatusCommand(CLI::App &app, GitRepository *repo);
-bool setupResolveConflictCommand(CLI::App &app, GitRepository *repo);
-bool setupPushCommand(CLI::App &app, GitRepository *repo);
-bool setupPullCommand(CLI::App &app, GitRepository *repo);
-bool setupRemoteCommand(CLI::App &app, GitRepository *repo);
+bool setupInitCommand(CLI::App &app, GitRepository &repo);
+bool setupHashObjectCommand(CLI::App &app, GitRepository &repo);
+bool setupWriteTreeCommand(CLI::App &app, GitRepository &repo);
+bool setupCommitTreeCommand(CLI::App &app, GitRepository &repo);
+bool setupTagObjectCommand(CLI::App &app, GitRepository &repo);
+bool setupReadObjectCommand(CLI::App &app, GitRepository &repo);
+bool setupCatFileCommand(CLI::App &app, GitRepository &repo);
+bool setupLsReadCommand(CLI::App &app, GitRepository &repo);
+bool setupLsTreeCommand(CLI::App &app, GitRepository &repo);
+bool setupLsTreeRecursiveCommand(CLI::App &app, GitRepository &repo);
+bool setupAddCommand(CLI::App &app, GitRepository &repo);
+bool setupStatusCommand(CLI::App &app, GitRepository &repo);
+bool setupBranchCommand(CLI::App &app, GitRepository &repo);
+bool setupSwitchCommand(CLI::App &app, GitRepository &repo);
+bool setupCheckoutCommand(CLI::App &app, GitRepository &repo);
+bool setupMergeCommand(CLI::App &app, GitRepository &repo);
+bool setupMergeContinueCommand(CLI::App &app, GitRepository &repo);
+bool setupMergeAbortCommand(CLI::App &app, GitRepository &repo);
+bool setupMergeStatusCommand(CLI::App &app, GitRepository &repo);
+bool setupResolveConflictCommand(CLI::App &app, GitRepository &repo);
+bool setupPushCommand(CLI::App &app, GitRepository &repo);
+bool setupPullCommand(CLI::App &app, GitRepository &repo);
+bool setupRemoteCommand(CLI::App &app, GitRepository &repo);
 bool handleConfigSet(GitRepository &, const std::string &key,
                      const std::string &value);
 bool handleConfigGet(GitRepository &, const std::string &key);
-bool setupConfigCommand(CLI::App &app, GitRepository *repo);
+bool setupConfigCommand(CLI::App &app, GitRepository &repo);
 bool handleCommitCommand(GitRepository &repo, const std::string &message,
                          const std::string &author);
-bool setupCommitCommand(CLI::App &app, GitRepository *repo);
+bool setupCommitCommand(CLI::App &app, GitRepository &repo);

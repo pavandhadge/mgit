@@ -10,7 +10,7 @@
 int main(int argc, char** argv) {
     try {
         CLI::App app{"MGit - A Git clone implementation"};
-        GitRepository* repo = nullptr;
+        GitRepository repo(".git");
         GitActivityLogger logger;
         
         // Log the command start
@@ -23,10 +23,8 @@ int main(int argc, char** argv) {
             logger.startCommand(argv[1], args);
         }
         
-        // Use a pointer for CLI setup and update it later if needed
-        GitRepository dummyRepo;
-        GitRepository* repoPtr = &dummyRepo;
-        setupAllCommands(app, repoPtr);
+        // Register callbacks against a single repository object.
+        setupAllCommands(app, repo);
         
         // Parse command to see if .git is needed
         bool needsRepo = true;
@@ -45,11 +43,6 @@ int main(int argc, char** argv) {
             std::cerr << "Fatal error: Git directory does not exist: .git\n";
             return 1;
         }
-        if (needsRepo) {
-            repo = new GitRepository();
-            repoPtr = repo;
-        }
-        
         int exit_code = 0;
         std::string result = "Success";
         std::string error_msg = "";
@@ -72,7 +65,6 @@ int main(int argc, char** argv) {
             logger.endCommand(result, exit_code, error_msg);
         }
         
-        if (repo) delete repo;
         return exit_code;
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;

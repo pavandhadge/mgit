@@ -219,8 +219,7 @@ bool GitMerge::threeWayMerge(const std::string &currentCommit,
 
     // Update index with merged tree
     IndexManager index(gitDir);
-    // TODO: Implement updateIndexFromTree method
-    // index->updateIndexFromTree(mergedTree);
+    index.resetFromTree(mergedTree);
 
     return true;
   } catch (const std::exception &e) {
@@ -257,13 +256,12 @@ bool GitMerge::checkForConflicts(const std::string &currentBranch,
   validateTreeHash(targetTreeHash);
 
   // Find common ancestor (for three-way merge)
-  // TODO: Implement findCommonAncestor method
-  std::string commonAncestor =
-      ""; // repo.findCommonAncestor(currentHead, targetHead);
-  std::string ancestorTreeHash =
-      commonAncestor.empty()
-          ? ""
-          : storage->readObject(commonAncestor).substr(5, 40);
+  std::string commonAncestor = repo.findCommonAncestor(currentHead, targetHead);
+  std::string ancestorTreeHash;
+  if (!commonAncestor.empty()) {
+    CommitData ancestorCommitData = commitObj.readObject(commonAncestor);
+    ancestorTreeHash = ancestorCommitData.tree;
+  }
 
   if (!ancestorTreeHash.empty()) {
     validateTreeHash(ancestorTreeHash);
@@ -423,10 +421,25 @@ bool GitMerge::compareBlobs(const std::string &blob1,
 bool GitMerge::findConflictsInTree(const std::string &tree1,
                                    const std::string &tree2) {
   try {
-    // TODO: Implement tree conflict detection
-    return true;
+    return !compareTreeEntries(tree1, tree2, true);
   } catch (const std::exception &e) {
     std::cerr << "findConflictsInTree failed: " << e.what() << std::endl;
+    return false;
+  }
+}
+
+bool GitMerge::findConflictsInBlob(const std::string &blob1,
+                                   const std::string &blob2,
+                                   const std::string &filename) {
+  try {
+    if (!compareBlobs(blob1, blob2)) {
+      conflicts[filename] = ConflictStatus::CONTENT_CONFLICT;
+      conflictDetails[filename] = "File contents differ";
+      return true;
+    }
+    return false;
+  } catch (const std::exception &e) {
+    std::cerr << "findConflictsInBlob failed: " << e.what() << std::endl;
     return false;
   }
 }
@@ -434,7 +447,9 @@ bool GitMerge::findConflictsInTree(const std::string &tree1,
 bool GitMerge::detectFileRenames(const std::string &tree1,
                                  const std::string &tree2) {
   try {
-    // TODO: Implement file rename detection
+    (void)tree1;
+    (void)tree2;
+    // Placeholder: no rename tracking yet.
     return true;
   } catch (const std::exception &e) {
     std::cerr << "detectFileRenames failed: " << e.what() << std::endl;
@@ -445,19 +460,62 @@ bool GitMerge::detectFileRenames(const std::string &tree1,
 bool GitMerge::detectDirectoryConflicts(const std::string &tree1,
                                         const std::string &tree2) {
   try {
-    // TODO: Implement directory conflict detection
-    return true;
+    return !compareTreeEntries(tree1, tree2, true);
   } catch (const std::exception &e) {
     std::cerr << "detectDirectoryConflicts failed: " << e.what() << std::endl;
     return false;
   }
 }
 
-bool GitMerge::compareTreeEntries(const std::string &, const std::string &,
-                                  bool) {
+bool GitMerge::compareTreeEntries(const std::string &tree1,
+                                  const std::string &tree2, bool recursive) {
   try {
-    // TODO: Implement this function
-    return true;
+    std::vector<TreeEntry> entries1 = TreeObject(gitDir).readObject(tree1);
+    std::vector<TreeEntry> entries2 = TreeObject(gitDir).readObject(tree2);
+    std::map<std::string, TreeEntry> map1, map2;
+    for (const auto &entry : entries1)
+      map1[entry.filename] = entry;
+    for (const auto &entry : entries2)
+      map2[entry.filename] = entry;
+
+    bool equal = true;
+    for (const auto &[name, entry1] : map1) {
+      auto it2 = map2.find(name);
+      if (it2 == map2.end()) {
+        conflicts[name] = ConflictStatus::DELETED_IN_THEIRS;
+        conflictDetails[name] =
+            "File exists in current branch but deleted in target branch";
+        equal = false;
+        continue;
+      }
+
+      const auto &entry2 = it2->second;
+      if (entry1.mode != entry2.mode) {
+        conflicts[name] = ConflictStatus::TREE_CONFLICT;
+        conflictDetails[name] = "File mode/type differs";
+        equal = false;
+        continue;
+      }
+
+      if (entry1.mode == "040000" && recursive) {
+        if (!compareTreeEntries(entry1.hash, entry2.hash, true)) {
+          equal = false;
+        }
+      } else if (entry1.hash != entry2.hash) {
+        findConflictsInBlob(entry1.hash, entry2.hash, name);
+        equal = false;
+      }
+    }
+
+    for (const auto &[name, _entry2] : map2) {
+      if (map1.find(name) == map1.end()) {
+        conflicts[name] = ConflictStatus::DELETED_IN_OURS;
+        conflictDetails[name] =
+            "File exists in target branch but deleted in current branch";
+        equal = false;
+      }
+    }
+    return equal;
   } catch (const std::exception &e) {
     std::cerr << "compareTreeEntries failed: " << e.what() << std::endl;
     return false;

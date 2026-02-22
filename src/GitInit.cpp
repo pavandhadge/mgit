@@ -27,7 +27,7 @@ bool GitInit::run() {
         createFile(dotGit + "/HEAD", "ref: refs/heads/main\n");
         createFile(dotGit + "/refs/heads/main", "");
         createFile(dotGit + "/index", "");
-        gitHead head;
+        gitHead head(dotGit);
         head.writeHeadToHeadOfNewBranch("main");
         return true;
     } catch (const std::exception& e) {

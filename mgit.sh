@@ -7,6 +7,7 @@
 # Learn more: https://codecrafters.io/program-interface
 
 set -e # Exit early if any commands fail
+export XMAKE_GLOBALDIR="$(dirname "$0")/.xmake-global"
 
 # Copied from .codecrafters/compile.sh
 #
@@ -14,12 +15,12 @@ set -e # Exit early if any commands fail
 # - Edit .codecrafters/compile.sh to change how your program compiles remotely
 (
   cd "$(dirname "$0")" # Ensure compile steps are run within the repository directory
-  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
-  cmake --build ./build
+  xmake f -m release
+  xmake
 )
 
 # Copied from .codecrafters/run.sh
 #
 # - Edit this to change how your program runs locally
 # - Edit .codecrafters/run.sh to change how your program runs remotely
-exec $(dirname "$0")/build/mgit "$@"
+exec xmake run mgit "$@"

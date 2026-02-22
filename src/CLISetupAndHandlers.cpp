@@ -741,19 +741,28 @@ bool setupMergeCommand(CLI::App &app, GitRepository &repo) {
   cmd->add_flag("--abort", *abortMerge, "Abort the current merge process");
 
   cmd->callback([&repo, targetBranch, continueMerge, abortMerge]() {
+    bool ok = false;
     if (*continueMerge) {
-      return handleMergeContinue(repo);
+      ok = handleMergeContinue(repo);
+      if (!ok)
+        throw CLI::RuntimeError(1);
+      return;
     }
     if (*abortMerge) {
-      return handleMergeAbort(repo);
+      ok = handleMergeAbort(repo);
+      if (!ok)
+        throw CLI::RuntimeError(1);
+      return;
     }
     if (targetBranch->empty()) {
       std::cerr << "error: A branch name is required to start a merge."
                 << std::endl;
       std::cerr << "Usage: mgit merge <branch>" << std::endl;
-      return false;
+      throw CLI::RuntimeError(1);
     }
-    return handleMergeCommand(repo, *targetBranch);
+    ok = handleMergeCommand(repo, *targetBranch);
+    if (!ok)
+      throw CLI::RuntimeError(1);
   });
 
   return true;
@@ -776,7 +785,9 @@ bool setupResolveConflictCommand(CLI::App &app, GitRepository &repo) {
       ->required()
       ->type_name("HASH");
   cmd->callback([&repo, path, hash]() {
-    return handleResolveConflict(repo, *path, *hash);
+    if (!handleResolveConflict(repo, *path, *hash)) {
+      throw CLI::RuntimeError(1);
+    }
   });
   return true;
 }
@@ -882,7 +893,7 @@ bool setupLogCommand(CLI::App &app, GitRepository &repo) {
   auto cmd = app.add_subcommand("log", "Show commit logs (not implemented)");
   cmd->callback([]() {
     std::cout << "log: Not implemented\n";
-    return false;
+    throw CLI::RuntimeError(1);
   });
   return true;
 }
@@ -906,34 +917,34 @@ bool setupLsTreeRecursiveCommand(CLI::App &app, GitRepository &repo) {
 }
 
 // ==================== MAIN APP SETUP ====================
-bool setupAllCommands(CLI::App &app, GitRepository *repoPtr) {
+bool setupAllCommands(CLI::App &app, GitRepository &repo) {
   setupCLIAppHelp(app);
-  setupInitCommand(app, *repoPtr);
-  setupHashObjectCommand(app, *repoPtr);
-  setupWriteTreeCommand(app, *repoPtr);
-  setupCommitTreeCommand(app, *repoPtr);
-  setupTagObjectCommand(app, *repoPtr);
-  setupReadObjectCommand(app, *repoPtr);
-  setupCatFileCommand(app, *repoPtr);
-  setupLsReadCommand(app, *repoPtr);
-  setupLsTreeCommand(app, *repoPtr);
-  setupAddCommand(app, *repoPtr);
-  setupStatusCommand(app, *repoPtr);
-  setupBranchCommand(app, *repoPtr);
-  setupSwitchCommand(app, *repoPtr);
-  setupCheckoutCommand(app, *repoPtr);
-  setupMergeCommand(app, *repoPtr);
+  setupInitCommand(app, repo);
+  setupHashObjectCommand(app, repo);
+  setupWriteTreeCommand(app, repo);
+  setupCommitTreeCommand(app, repo);
+  setupTagObjectCommand(app, repo);
+  setupReadObjectCommand(app, repo);
+  setupCatFileCommand(app, repo);
+  setupLsReadCommand(app, repo);
+  setupLsTreeCommand(app, repo);
+  setupAddCommand(app, repo);
+  setupStatusCommand(app, repo);
+  setupBranchCommand(app, repo);
+  setupSwitchCommand(app, repo);
+  setupCheckoutCommand(app, repo);
+  setupMergeCommand(app, repo);
 
-  setupMergeStatusCommand(app, *repoPtr);
-  setupResolveConflictCommand(app, *repoPtr);
-  setupActivityLogCommand(app, *repoPtr);
-  setupPushCommand(app, *repoPtr);
-  setupPullCommand(app, *repoPtr);
-  setupRemoteCommand(app, *repoPtr);
-  setupConfigCommand(app, *repoPtr);
-  setupCommitCommand(app, *repoPtr);
-  setupLogCommand(app, *repoPtr);
-  setupLsTreeRecursiveCommand(app, *repoPtr);
+  setupMergeStatusCommand(app, repo);
+  setupResolveConflictCommand(app, repo);
+  setupActivityLogCommand(app, repo);
+  setupPushCommand(app, repo);
+  setupPullCommand(app, repo);
+  setupRemoteCommand(app, repo);
+  setupConfigCommand(app, repo);
+  setupCommitCommand(app, repo);
+  setupLogCommand(app, repo);
+  setupLsTreeRecursiveCommand(app, repo);
   return true;
 }
 

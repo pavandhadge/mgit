@@ -5,10 +5,10 @@
 #include <zlib.h>
 #include <iostream>
 #include <iomanip>
-#include <openssl/sha.h>
 #include <sstream>
 #include <ctime>
 #include <cmath>
+#include <cstdint>
 
 std::string decompressZlib(const std::vector<char>& compressed) {
     std::vector<char> output(100000); // Start with 100KB, resize if needed
@@ -51,12 +51,82 @@ std::string compressZlib(const std::string& input) {
 
 
 std::string hash_sha1(const std::string& data) {
-    unsigned char hash[SHA_DIGEST_LENGTH];  // 20 bytes for SHA-1
-    SHA1(reinterpret_cast<const unsigned char*>(data.c_str()), data.size(), hash);
+    auto leftrotate = [](uint32_t value, int bits) -> uint32_t {
+        return (value << bits) | (value >> (32 - bits));
+    };
 
+    std::vector<unsigned char> msg(data.begin(), data.end());
+    uint64_t bit_len = static_cast<uint64_t>(msg.size()) * 8;
+
+    msg.push_back(0x80);
+    while ((msg.size() % 64) != 56) {
+        msg.push_back(0x00);
+    }
+    for (int i = 7; i >= 0; --i) {
+        msg.push_back(static_cast<unsigned char>((bit_len >> (i * 8)) & 0xFF));
+    }
+
+    uint32_t h0 = 0x67452301;
+    uint32_t h1 = 0xEFCDAB89;
+    uint32_t h2 = 0x98BADCFE;
+    uint32_t h3 = 0x10325476;
+    uint32_t h4 = 0xC3D2E1F0;
+
+    for (size_t chunk = 0; chunk < msg.size(); chunk += 64) {
+        uint32_t w[80];
+        for (int i = 0; i < 16; ++i) {
+            size_t j = chunk + i * 4;
+            w[i] = (static_cast<uint32_t>(msg[j]) << 24) |
+                   (static_cast<uint32_t>(msg[j + 1]) << 16) |
+                   (static_cast<uint32_t>(msg[j + 2]) << 8) |
+                   static_cast<uint32_t>(msg[j + 3]);
+        }
+        for (int i = 16; i < 80; ++i) {
+            w[i] = leftrotate(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+        }
+
+        uint32_t a = h0;
+        uint32_t b = h1;
+        uint32_t c = h2;
+        uint32_t d = h3;
+        uint32_t e = h4;
+
+        for (int i = 0; i < 80; ++i) {
+            uint32_t f = 0;
+            uint32_t k = 0;
+            if (i < 20) {
+                f = (b & c) | ((~b) & d);
+                k = 0x5A827999;
+            } else if (i < 40) {
+                f = b ^ c ^ d;
+                k = 0x6ED9EBA1;
+            } else if (i < 60) {
+                f = (b & c) | (b & d) | (c & d);
+                k = 0x8F1BBCDC;
+            } else {
+                f = b ^ c ^ d;
+                k = 0xCA62C1D6;
+            }
+            uint32_t temp = leftrotate(a, 5) + f + e + k + w[i];
+            e = d;
+            d = c;
+            c = leftrotate(b, 30);
+            b = a;
+            a = temp;
+        }
+
+        h0 += a;
+        h1 += b;
+        h2 += c;
+        h3 += d;
+        h4 += e;
+    }
+
+    uint32_t digest[5] = {h0, h1, h2, h3, h4};
     std::ostringstream result;
-    for (int i = 0; i < SHA_DIGEST_LENGTH; ++i) {
-        result << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    result << std::hex << std::setfill('0');
+    for (int i = 0; i < 5; ++i) {
+        result << std::setw(8) << digest[i];
     }
     return result.str();
 }

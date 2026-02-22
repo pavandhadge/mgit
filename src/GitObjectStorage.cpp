@@ -264,3 +264,29 @@ std::string GitObjectStorage::getObjectPath(const std::string &hash) const {
     return "";
   return gitDir + "/objects/" + hash.substr(0, 2) + "/" + hash.substr(2);
 }
+
+std::vector<std::string> GitObjectStorage::listAllObjects() const {
+  std::vector<std::string> objects;
+  std::string base = gitDir + "/objects";
+  if (!std::filesystem::exists(base)) {
+    return objects;
+  }
+  for (const auto &dirEntry : std::filesystem::directory_iterator(base)) {
+    if (!dirEntry.is_directory()) {
+      continue;
+    }
+    std::string prefix = dirEntry.path().filename().string();
+    if (prefix.size() != 2) {
+      continue;
+    }
+    for (const auto &objEntry : std::filesystem::directory_iterator(dirEntry.path())) {
+      if (!objEntry.is_regular_file()) {
+        continue;
+      }
+      objects.push_back(prefix + objEntry.path().filename().string());
+    }
+  }
+  return objects;
+}
+
+size_t GitObjectStorage::getObjectCount() const { return listAllObjects().size(); }
