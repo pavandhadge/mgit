@@ -65,9 +65,25 @@ target("publish")
     set_kind("phony")
     add_deps("mgit_prod")
     on_run(function ()
+        local function starts_with(str, prefix)
+            return str:sub(1, #prefix) == prefix
+        end
         local stamp = os.date("%Y%m%d-%H%M%S")
         local pkgname = "mgit-" .. stamp .. "-linux-x86_64"
         local distdir = "dist"
+        os.mkdir(distdir)
+        for _, path in ipairs(os.files(distdir .. "/mgit-*-linux-x86_64*")) do
+            local name = path:match("([^/]+)$") or path
+            if starts_with(name, "mgit-") and name:find("-linux%-x86_64") then
+                os.rm(path)
+            end
+        end
+        for _, path in ipairs(os.dirs(distdir .. "/mgit-*-linux-x86_64")) do
+            local name = path:match("([^/]+)$") or path
+            if starts_with(name, "mgit-") and name:find("-linux%-x86_64") then
+                os.rm(path)
+            end
+        end
         local pkgdir = distdir .. "/" .. pkgname
         os.mkdir(pkgdir .. "/bin")
         os.cp("build/prod/mgit", pkgdir .. "/bin/mgit")
